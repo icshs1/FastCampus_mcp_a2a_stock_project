@@ -3,6 +3,16 @@ Analysis Agent with A2A Integration.
 
 This module provides an Analysis agent that implements the standardized
 A2A interface for comprehensive market analysis.
+
+Beginner notes:
+    - A2AOutput: A typed dict used across all A2A agents so that streaming
+      events and final results share a consistent schema (``status``,
+      ``text_content``/``data_content``, ``final`` flags, and ``metadata``).
+    - Streaming events: LangGraph emits events such as ``on_llm_stream``,
+      ``on_tool_start``, ``on_tool_end``. We translate only meaningful parts
+      to A2AOutput. Everything else is ignored to keep the stream clean.
+    - Buffering: ``A2AStreamBuffer`` aggregates tiny token chunks and flushes
+      intermittently so clients receive readable updates instead of raw tokens.
 """
 
 from datetime import datetime
@@ -38,6 +48,12 @@ class AnalysisA2AAgent(BaseA2AAgent, BaseGraphAgent):
     - Macro Economic Analysis
 
     Provides category-based signals: STRONG_BUY, BUY, HOLD, SELL, STRONG_SELL
+
+    Design goals:
+        - Unify streaming and polling via A2A interface
+        - Keep internal state minimal and explicit (``analysis_dimensions``,
+          ``final_signal``)
+        - Make outputs machine- and human-consumable simultaneously
     """
 
     def __init__(
@@ -90,7 +106,17 @@ class AnalysisA2AAgent(BaseA2AAgent, BaseGraphAgent):
         self.final_signal: Optional[str] = None
 
     async def initialize(self):
-        """Initialize the agent with MCP tools and create the graph."""
+        """Initialize the agent with MCP tools and create the graph.
+
+        Steps:
+            1) Load domain tools via MCP (``load_analysis_tools``)
+            2) Build the system prompt tailored by tool count
+            3) Create a ReAct-style LangGraph agent with checkpointing
+
+        Raises:
+            RuntimeError: When tool loading, prompt building, or graph creation
+                fails; the original exception is attached as context.
+        """
         try:
             # Load MCP tools
             self.tools = await load_analysis_tools()
@@ -122,15 +148,21 @@ class AnalysisA2AAgent(BaseA2AAgent, BaseGraphAgent):
         input_dict: dict[str, Any],
         config: Optional[dict[str, Any]] = None
     ) -> A2AOutput:
-        """
-        Execute the agent with A2A-compatible input and output.
+        """Execute the agent with A2A-compatible input and output.
 
         Args:
-            input_dict: Input data containing messages or analysis request
-            config: Optional configuration (thread_id, etc.)
+            input_dict: Either a ``{"messages": [...]}`` style payload or a
+                structured analysis request. Messages should be LangChain
+                Message objects (e.g., ``HumanMessage``).
+            config: Optional execution config. If omitted, a fresh
+                ``thread_id`` is generated to isolate this run.
 
         Returns:
-            A2AOutput: Standardized output for A2A processing
+            A2AOutput: Final standardized output when the graph completes.
+
+        Notes:
+            - Any exceptions are converted to a standardized error A2AOutput
+              via ``format_error`` to keep client behavior uniform.
         """
         if not self.graph:
             await self.initialize()
@@ -164,14 +196,21 @@ class AnalysisA2AAgent(BaseA2AAgent, BaseGraphAgent):
         self,
         event: dict[str, Any]
     ) -> Optional[A2AOutput]:
-        """
-        Convert a streaming event to standardized A2A output.
+        """Convert a LangGraph streaming event to an ``A2AOutput``.
 
         Args:
-            event: Raw streaming event from LangGraph
+            event: Raw event dict (expects keys like ``event``, ``name``,
+                and nested ``data`` depending on the event type).
 
         Returns:
-            A2AOutput if the event should be forwarded, None otherwise
+            Optional[A2AOutput]: ``None`` when the event does not warrant an
+            outbound message (e.g., small token chunk buffered), otherwise a
+            structured update.
+
+        Supported events:
+            - ``on_llm_stream``: token chunks; buffered and flushed
+            - ``on_tool_start``/``on_tool_end``: tool lifecycle signals
+            - completion events (see ``is_completion_event``)
         """
         event_type = event.get("event", "")
 
@@ -251,14 +290,19 @@ class AnalysisA2AAgent(BaseA2AAgent, BaseGraphAgent):
         self,
         state: dict[str, Any]
     ) -> A2AOutput:
-        """
-        Extract final output from the agent's state.
+        """Extract final output from the LangGraph run ``state``.
 
         Args:
-            state: Final state from the LangGraph execution
+            state: Run state dict that usually contains ``messages`` with the
+                last ``AIMessage`` representing the run summary.
 
         Returns:
-            A2AOutput: Final standardized output
+            A2AOutput: Final message including structured analysis fields
+            (per-dimension scores, composite score, and signal).
+
+        Implementation notes:
+            - If an explicit signal is not present in text, we derive it from
+              the composite score to avoid returning an empty recommendation.
         """
         try:
             # Extract messages from state
@@ -319,7 +363,12 @@ class AnalysisA2AAgent(BaseA2AAgent, BaseGraphAgent):
     # Helper methods for analysis
 
     def _track_analysis_dimensions(self, content: str):
-        """Track which analysis dimensions are being processed."""
+        """Track which analysis dimensions are being processed.
+
+        Heuristics:
+            - Keyword scanning per dimension marks a dimension as
+              "processing" until a numeric score is later received.
+        """
         content_lower = content.lower()
 
         dimension_keywords = {
@@ -335,7 +384,10 @@ class AnalysisA2AAgent(BaseA2AAgent, BaseGraphAgent):
                     self.analysis_dimensions[dimension] = "processing"
 
     def _identify_analysis_dimension(self, tool_name: str) -> str:
-        """Identify which analysis dimension a tool belongs to."""
+        """Map a tool name to the most likely analysis dimension.
+
+        Falls back to ``"general"`` when no reliable mapping exists.
+        """
         tool_lower = tool_name.lower()
 
         if any(x in tool_lower for x in ["technical", "chart", "indicator"]):
@@ -350,7 +402,7 @@ class AnalysisA2AAgent(BaseA2AAgent, BaseGraphAgent):
         return "general"
 
     def _get_analysis_progress(self) -> dict[str, Any]:
-        """Get current analysis progress."""
+        """Return a structured snapshot of analysis progress."""
         completed = sum(
             1 for v in self.analysis_dimensions.values()
             if v is not None and v != "processing"
@@ -364,7 +416,7 @@ class AnalysisA2AAgent(BaseA2AAgent, BaseGraphAgent):
         }
 
     def _calculate_composite_analysis(self) -> tuple[float, str]:
-        """Calculate composite score and confidence level."""
+        """Calculate a composite score and qualitative confidence level."""
         scores = []
 
         for _dimension, value in self.analysis_dimensions.items():
@@ -391,7 +443,7 @@ class AnalysisA2AAgent(BaseA2AAgent, BaseGraphAgent):
         return composite, confidence
 
     def _determine_signal(self, score: float) -> str:
-        """Determine trading signal based on composite score."""
+        """Map a composite score to a categorical recommendation signal."""
         if score >= 80:
             return "STRONG_BUY"
         elif score >= 60:
@@ -404,7 +456,10 @@ class AnalysisA2AAgent(BaseA2AAgent, BaseGraphAgent):
             return "STRONG_SELL"
 
     def _extract_signal_from_text(self, text: str) -> Optional[str]:
-        """Extract signal from analysis text."""
+        """Extract a recommendation signal from unstructured text.
+
+        Supports both English (e.g., ``BUY``) and Korean (예: ``매수``).
+        """
         text_upper = text.upper()
 
         signals = ["STRONG_BUY", "STRONG_SELL", "BUY", "SELL", "HOLD"]

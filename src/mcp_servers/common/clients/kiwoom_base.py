@@ -3,6 +3,14 @@
 
 모든 키움 MCP 서버가 공유하는 기본 HTTP 클라이언트와 인증 로직을 제공합니다.
 BaseHTTPClient를 확장하여 키움 API 특화 기능을 구현합니다.
+
+Beginner notes:
+    - Access token lifecycle: ``_get_access_token`` caches and refreshes tokens
+      5 minutes before expiry to avoid mid-call failures.
+    - Verification cache: ``check_api_verification`` reads a local cache file
+      when available to warn about unverified APIs; it does not block execution.
+    - Safety defaults: In connectivity/auth failures, ``_make_request`` returns
+      a mock-style response for resilience in development.
 """
 
 import json

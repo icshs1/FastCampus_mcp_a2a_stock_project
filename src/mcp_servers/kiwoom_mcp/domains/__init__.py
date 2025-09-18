@@ -1,14 +1,20 @@
 """
 키움 도메인 서버 패키지 (5개 새로운 도메인)
 
-키움증권 API를 도메인별로 분류한 MCP 서버들:
-- MarketDomainServer: 시장 데이터 관련 (포트 8031)
-- InfoDomainServer: 종목 정보 관련 (포트 8032)
-- TradingDomainServer: 거래 관련 (포트 8030)
-- InvestorDomainServer: 투자자 정보 관련 (포트 8033)
-- PortfolioDomainServer: 포트폴리오 관련 (포트 8034)
+아키텍처 개요:
+    - MarketDomainServer (8031): 실시간 시세/호가/체결, 차트, 랭킹
+    - InfoDomainServer (8032): 종목/업종/테마/ETF 정보
+    - TradingDomainServer (8030): 주문/정정/취소, 체결/미체결, 리스크
+    - InvestorDomainServer (8033): 기관/외국인/프로그램 매매 동향
+    - PortfolioDomainServer (8034): 계좌/보유종목/손익/성과/리스크
 
-레거시 서버들은 모두 제거되고 새로운 도메인 아키텍처로 통합됨.
+Beginner notes:
+    - 각 도메인은 ``KiwoomDomainServer``를 상속합니다. 공통 CORS 설정,
+      표준 응답(``StandardResponse``), 에러 포맷을 재사용합니다.
+    - 모든 도구는 ``@server.mcp.tool()`` 데코레이터로 등록되어 FastMCP의
+      HTTP/Streaming 엔드포인트로 노출됩니다.
+    - 로컬 개발에서는 포트 충돌을 주의하세요. 각 도메인은 고정 포트를
+      사용하므로 병렬 실행 시 포트가 열려 있어야 합니다.
 """
 
 from src.mcp_servers.kiwoom_mcp.domains.info_domain import (

@@ -2,6 +2,11 @@
 MCP 서버 공통 에러 처리 유틸리티
 
 모든 MCP 서버에서 사용할 수 있는 일관된 에러 처리 데코레이터와 헬퍼 함수들을 제공합니다.
+
+Beginner notes:
+    - This module is lightweight and separate from the richer common/exceptions.py.
+      Use this when you need a simple decorator without tracing/metrics.
+    - Prefer returning dicts for MCP tools so clients always receive JSON.
 """
 
 import functools

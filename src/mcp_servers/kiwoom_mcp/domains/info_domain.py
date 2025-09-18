@@ -8,6 +8,13 @@
 - ETF 정보 및 시세
 
 포트: 8032
+
+Beginner notes:
+    - 모든 엔드포인트는 ``StandardResponse`` 형태로 응답합니다.
+      성공 시 ``success=True``와 함께 ``data`` 필드가 채워지며, 실패 시
+      ``error`` 메시지를 제공합니다.
+    - 입력 검증은 최대한 일찍 수행하며, 잘못된 인자는 사용자 친화적인
+      한글 오류 메시지로 반환합니다 (HTTP 200 + 실패 페이로드).
 """
 
 import logging

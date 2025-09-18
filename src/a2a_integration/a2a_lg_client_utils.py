@@ -29,7 +29,15 @@ wrapper_logger = logging.getLogger(__name__)
 class A2AClientManager:
     """A2A 표준 클라이언트 관리 클래스.
 
-    - 에이전트 카드 조회 및 A2A 클라이언트 초기화/종료 수명주기 관리
+    초보자 메모:
+        - A2A는 에이전트 간 표준 통신 규격입니다. 클라이언트는
+          `/.well-known/agent-card.json`에서 메타데이터를 읽고 적정
+          전송 방식(JSON-RPC, HTTP JSON 등)을 자동 협상합니다.
+
+    역할:
+        - 에이전트 카드 조회 및 A2A 클라이언트 초기화/종료 수명주기 관리
+        - 헬스체크/재연결, 메시지 생성 유틸리티 제공
+        - 재시도 래퍼(`_execute_with_retry`)로 네트워크 변동성에 대비
     """
 
     def __init__(
@@ -62,6 +70,10 @@ class A2AClientManager:
         - 원격 `/.well-known/agent-card.json`을 가져와 `AgentCard` 구성
         - 스트리밍/전송 프로토콜 설정 후 실제 전송 클라이언트 생성
         - 호출자는 컨텍스트 매니저(`async with`) 사용을 권장
+
+        주의:
+            개발 로컬 환경에서는 Docker 컨테이너 호스트명이 포함된 URL을
+            `localhost`로 보정하여 접속 실패를 방지합니다.
         """
         try:
             logger.debug(f"Initializing A2A client for {self.base_url}")
@@ -299,6 +311,7 @@ class A2AClientManager:
             user_message: 사용자 메시지 문자열 또는 딕셔너리
 
         Returns:
+            Message: A2A SDK 포맷의 메시지
         """
         if not isinstance(user_message, (str, dict)):
             raise ValueError("사용자 메시지는 문자열 또는 딕셔너리여야 합니다.")
@@ -309,7 +322,12 @@ class A2AClientManager:
             return self.create_data_message_object(data=user_message)
 
     async def send_server_to_user_message(self, data: dict[str, Any]) -> Any:
-        """Server에서 User로 메시지를 전송한다."""
+        """Server에서 User로 메시지를 전송한다.
+
+        구현자 메모:
+            - 사용 중인 A2A 서버/클라이언트 조합에 따라 별도 엔드포인트가
+              필요할 수 있습니다. 현재는 샘플로 남겨두었습니다.
+        """
         if not self.a2a_client:
             raise A2AClientError(
                 "클라이언트가 초기화되지 않았습니다. initialize()를 먼저 호출하세요."

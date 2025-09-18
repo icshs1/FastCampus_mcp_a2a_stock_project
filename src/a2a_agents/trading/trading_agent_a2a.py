@@ -57,20 +57,18 @@ class TradingAgentA2A:
         self.executor = None  # A2A 프로토콜 호환 에이전트 실행기 (LangGraphAgentExecutor)
 
     async def initialize(self):
-        """
-        LangGraph Agent 및 A2A 래퍼 초기화
+        """LangGraph Agent 및 A2A 래퍼 초기화.
 
-        초기화 단계:
-            1. A2A 호환 실행기 생성 (내부적으로 TradingAgent 생성)
-            2. MCP 거래 서버 연결 (trading_domain, portfolio_domain)
-            3. LangGraph 상태 그래프 검증
+        Steps:
+            1) A2A 호환 실행기 생성 (TradingAgent 포함)
+            2) MCP 거래 도메인 연결 점검
+            3) 그래프 유효성 검증
 
         Returns:
             bool: 초기화 성공 여부
 
         Note:
-            초기화 실패 시 거래 기능이 비활성화되며,
-            안전을 위해 모든 주문이 차단됩니다.
+            초기화 실패 시 거래 기능이 비활성화되며, 안전을 위해 모든 주문이 차단됩니다.
         """
         try:
             # Step 1: Executor V2를 사용하여 A2A 호환 실행기 생성
@@ -86,7 +84,10 @@ class TradingAgentA2A:
             return False
 
     def get_agent_card(self, url: str):
-        """A2A AgentCard 생성"""
+        """A2A AgentCard 생성.
+
+        Docker 환경에서는 컨테이너 호스트명을 자동으로 사용합니다.
+        """
         if os.getenv("IS_DOCKER", "false").lower() == "true":
             url = f"http://trading-agent:{os.getenv('AGENT_PORT', '8003')}"
 
@@ -117,7 +118,7 @@ class TradingAgentA2A:
 
 
 def main():
-    """TradingAgent A2A 서버 실행"""
+    """TradingAgent A2A 서버 실행."""
     # 로깅 설정
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)

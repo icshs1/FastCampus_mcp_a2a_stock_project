@@ -20,6 +20,19 @@ class A2AOutput(TypedDict):
 
     This format unifies streaming events and final results,
     enabling consistent handling in the A2A executor.
+
+    Required keys:
+        - agent_type: Agent identifier (e.g., "DataCollector", "Analysis")
+        - status: One of {"working", "completed", "failed", "input_required"}
+        - stream_event: True for streaming events, False/omitted for final snapshots
+        - final: Whether this is the final output for the request
+
+    Optional keys:
+        - text_content: Rendered text (becomes TextPart)
+        - data_content: Structured payload (becomes DataPart)
+        - metadata: Arbitrary processing metadata
+        - error_message: Error details when status=="failed"
+        - requires_approval: HITL flows for trading, etc.
     """
 
     # Agent identification
@@ -29,31 +42,39 @@ class A2AOutput(TypedDict):
     status: Literal["working", "completed", "failed", "input_required"]
 
     # Content for A2A message parts
-    text_content: Optional[str]  # For TextPart
-    data_content: Optional[Dict[str, Any]]  # For DataPart (structured data)
+    text_content: Optional[str]
+    data_content: Optional[Dict[str, Any]]
 
     # Metadata for processing
-    metadata: Dict[str, Any]  # Additional context (timestamp, node_name, etc.)
+    metadata: Dict[str, Any]
 
     # Event type flags
-    stream_event: bool  # True for streaming events, False for final results
-    final: bool  # True when this is the last output
+    stream_event: bool
+    final: bool
 
     # Optional fields for specific use cases
-    error_message: Optional[str]  # Error details if status is "failed"
-    requires_approval: Optional[bool]  # For Human-in-the-Loop scenarios
+    error_message: Optional[str]
+    requires_approval: Optional[bool]
 
 
 class BaseA2AAgent(ABC):
     """
     Abstract base class for LangGraph agents with A2A integration.
 
-    This class defines the standard interface that all LangGraph agents
-    must implement to support A2A protocol integration.
+    Each concrete agent should implement the trio below:
+    - execute_for_a2a: run the workflow and return an ``A2AOutput``
+    - format_stream_event: convert streaming events to ``A2AOutput``
+    - extract_final_output: convert final graph state to ``A2AOutput``
+
+    Implementors should keep outputs small and serializable.
     """
 
     def __init__(self):
-        """Initialize the base A2A agent."""
+        """Initialize the base A2A agent.
+
+        Derives ``agent_type`` from the class name by removing the trailing
+        "Agent" to keep user-facing labels concise.
+        """
         self.agent_type = self.__class__.__name__.replace("Agent", "")
         logger.info(f"Initializing A2A agent: {self.agent_type}")
 
@@ -66,17 +87,18 @@ class BaseA2AAgent(ABC):
         """
         Execute the agent with A2A-compatible input and output.
 
-        This method replaces direct graph.ainvoke() calls, providing
-        a standardized interface for the A2A executor.
+        This method replaces direct graph.ainvoke() calls, providing a
+        standardized interface for the A2A executor.
 
         Args:
-            input_dict: Input data in standard format
-            config: Optional configuration (thread_id, etc.)
+            input_dict: Standard input dict (e.g., {"messages": [...]})
+            config: Optional config, must include thread_id under
+                config["configurable"]["thread_id"] when present
 
         Returns:
             A2AOutput: Standardized output for A2A processing
         """
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def format_stream_event(
@@ -97,7 +119,7 @@ class BaseA2AAgent(ABC):
         Returns:
             A2AOutput if the event should be forwarded, None otherwise
         """
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def extract_final_output(
@@ -107,8 +129,8 @@ class BaseA2AAgent(ABC):
         """
         Extract final output from the agent's state.
 
-        This method is called when the agent execution completes,
-        converting the final state to standardized A2A output.
+        Called when streaming has ended to emit a single final, consolidated
+        output for the current request.
 
         Args:
             state: Final state from the LangGraph execution
@@ -116,7 +138,7 @@ class BaseA2AAgent(ABC):
         Returns:
             A2AOutput: Final standardized output
         """
-        pass
+        raise NotImplementedError
 
     # Common utility methods
 
@@ -140,7 +162,7 @@ class BaseA2AAgent(ABC):
             metadata: Additional metadata
             stream_event: Whether this is a streaming event
             final: Whether this is the final output
-            **kwargs: Additional optional fields
+            **kwargs: Additional optional fields (e.g., error_message)
 
         Returns:
             A2AOutput: Standardized output dictionary
@@ -222,7 +244,7 @@ class BaseA2AAgent(ABC):
             event: Streaming event containing LLM output
 
         Returns:
-            str: Extracted content, or None if not an LLM event
+            str | None: Extracted content, or None if not an LLM event
         """
         if event.get("event") != "on_llm_stream":
             return None

@@ -1,8 +1,9 @@
 """
 Deprecated LangGraph A2A Agent Executor.
 
-This module provides a clean integration between LangGraph and A2A protocol,
-removing unnecessary abstractions and over-engineering.
+권장: ``executor_v2.LangGraphAgentExecutorV2`` 사용.
+본 모듈은 create_react_agent 기반 그래프를 A2A와 연결하는 초기 버전의 실행기입니다.
+남아있는 이유는 레거시 샘플 및 호환성 때문이며, 신규 코드는 V2를 사용하세요.
 """
 import asyncio
 import json
@@ -35,11 +36,10 @@ logger = structlog.get_logger(__name__)
 
 
 class LangGraphAgentExecutor(AgentExecutor):
-    """
-    A2A Agent Executor for LangGraph.
+    """A2A Agent Executor for LangGraph (legacy).
 
-    This executor provides a clean bridge between LangGraph state machines
-    and the A2A protocol, focusing on simplicity and SDK compliance.
+    간단한 브리지를 제공하지만, 세밀한 스트리밍/중단처리/결과 표준화는 V2가
+    더 안정적입니다. 유지보수 목적의 최소 변경만 수행합니다.
     """
 
     def __init__(
@@ -69,7 +69,7 @@ class LangGraphAgentExecutor(AgentExecutor):
             logger.warning("️ LangGraphAgentExecutor: Graph가 제공되지 않음")
 
     def _get_result_extractor(self, custom_extractor: Callable[[dict[str, Any]], str] | None) -> Callable[[dict[str, Any]], str]:
-        """Get the appropriate result extractor based on agent type."""
+        """Return result extractor (custom 우선, 없으면 기본 텍스트 추출기)."""
         if custom_extractor:
             return custom_extractor
 
@@ -157,7 +157,7 @@ class LangGraphAgentExecutor(AgentExecutor):
             logger.info(" Task completed via _send_result")
 
     def _clean_for_json(self, obj: Any) -> Any:
-        """Clean object to be JSON serializable."""
+        """Best-effort JSON 직렬화 변환 유틸리티."""
         # LangChain 메시지 객체 처리
         if hasattr(obj, '__class__') and 'langchain_core.messages' in str(obj.__class__):
             try:

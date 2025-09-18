@@ -56,7 +56,15 @@ class CustomSupervisorAgentA2A(AgentExecutor):
         self.task_managers: Dict[str, TaskManager] = {}
 
     async def _ensure_agent_initialized(self):
-        """SupervisorA2AAgent 초기화 - 다른 A2A 에이전트들의 URL 설정"""
+        """Ensure dependent A2A agent endpoints are configured.
+
+        - Resolves agent base URLs from environment variables.
+        - Supports both local and Docker environments transparently.
+
+        Env vars:
+            - DATA_COLLECTOR_URL, ANALYSIS_URL, TRADING_URL
+            - IS_DOCKER=true|false (auto-select hostnames)
+        """
         if not self.agent_urls:
             try:
                 # 환경에 따라 다른 A2A 에이전트들의 URL 설정
@@ -83,16 +91,22 @@ class CustomSupervisorAgentA2A(AgentExecutor):
                 raise RuntimeError(f"Agent initialization failed: {e}") from e
 
     async def _execute_workflow(self, input_dict: dict[str, Any], updater: TaskUpdater, context_id: str, task_id: str) -> dict[str, Any]:
-        """
-        SupervisorAgent 워크플로우 오케스트레이션 직접 구현.
+        """Execute the end-to-end orchestration workflow.
+
+        Steps:
+            1) Determine workflow pattern by parsing user query
+            2) Initialize and update A2A Task lifecycle (submitted → working)
+            3) Execute pattern (data → analysis → trading)
+            4) Finalize task state and build standardized output
 
         Args:
-            input_dict: 사용자 요청 데이터
-            context_id: 컨텍스트 ID
-            task_id: Task ID
+            input_dict: 표준 메시지 입력(dict)
+            updater: A2A TaskUpdater (상태/메시지 전송)
+            context_id: 요청 컨텍스트 식별자
+            task_id: A2A Task ID
 
         Returns:
-            A2AOutput 형식의 결과 데이터
+            dict: A2AOutput 준하는 응답 딕셔너리
         """
         try:
             # 1. 요청 분석 및 워크플로우 패턴 결정
@@ -205,7 +219,13 @@ class CustomSupervisorAgentA2A(AgentExecutor):
             }
 
     def _get_workflow_steps(self, pattern: str) -> list:
-        """워크플로우 패턴에 따른 단계 목록 반환."""
+        """Return ordered steps for a workflow pattern.
+
+        Patterns:
+            - DATA_ONLY: [data_collection]
+            - DATA_ANALYSIS: [data_collection, analysis]
+            - FULL_WORKFLOW: [data_collection, analysis, trading]
+        """
         if pattern == "DATA_ONLY":
             return ["data_collection"]
         elif pattern == "DATA_ANALYSIS":
@@ -215,7 +235,12 @@ class CustomSupervisorAgentA2A(AgentExecutor):
         return []
 
     def _extract_user_query(self, input_dict: dict[str, Any]) -> str:
-        """입력 데이터에서 사용자 쿼리 추출."""
+        """Extract the user query text from A2A-standard input dict.
+
+        Expected shape:
+            {"messages": [{"role": "user", "content": "..."}, ...]}
+        Falls back to ``str(input_dict)`` when not present.
+        """
         if isinstance(input_dict, dict) and "messages" in input_dict:
             messages = input_dict["messages"]
             if messages and isinstance(messages, list):
@@ -225,7 +250,11 @@ class CustomSupervisorAgentA2A(AgentExecutor):
         return str(input_dict)
 
     def _is_status_query(self, query: str) -> tuple[bool, Optional[str]]:
-        """상태 조회 요청인지 확인하고 Task ID 추출."""
+        """Detect status-query intent and extract target Task ID if possible.
+
+        Supports simple Korean/English trigger phrases and optional
+        embedded ``task-<uuid>`` pattern.
+        """
         query_lower = query.lower()
 
         # 상태 조회 패턴들
@@ -251,7 +280,11 @@ class CustomSupervisorAgentA2A(AgentExecutor):
         return False, None
 
     async def _get_workflow_status(self, task_id: Optional[str]) -> dict[str, Any]:
-        """워크플로우 상태 조회 - TaskManager 기반."""
+        """Return workflow status snapshot for a given Task ID.
+
+        Includes progress, current/pending/completed steps, recent messages,
+        and normalized A2A task status fields.
+        """
         if not task_id or task_id not in self.task_managers:
             return {
                 "status": "not_found",
@@ -339,7 +372,13 @@ class CustomSupervisorAgentA2A(AgentExecutor):
         }
 
     def _determine_workflow_pattern(self, user_query: str) -> str:
-        """사용자 쿼리를 분석해서 워크플로우 패턴 결정."""
+        """Infer workflow pattern from the user query.
+
+        Heuristics:
+            - Trade-related keywords → FULL_WORKFLOW
+            - Analysis-related keywords → DATA_ANALYSIS
+            - Default → FULL_WORKFLOW (보수적으로 전체 실행)
+        """
         query_lower = user_query.lower()
         # 거래 관련 키워드 체크
         trading_keywords = ["매수", "매도", "거래", "주문", "투자", "포트폴리오"]
@@ -361,7 +400,11 @@ class CustomSupervisorAgentA2A(AgentExecutor):
         updater: TaskUpdater,
         task_manager: TaskManager,
     ) -> dict[str, Any]:
-        """워크플로우 패턴에 따른 에이전트 실행 - TaskManager 기반."""
+        """Execute sub-agents according to a workflow pattern.
+
+        The function updates the A2A Task metadata and history between steps
+        to reflect user-visible progress.
+        """
         results = {"pattern": pattern, "steps": []}
 
         try:
@@ -545,7 +588,16 @@ class CustomSupervisorAgentA2A(AgentExecutor):
             return results
 
     async def _call_agent(self, agent_type: str, query: str, context_id: str) -> dict[str, Any]:
-        """A2A SDK를 사용한 에이전트 호출."""
+        """Call a downstream A2A agent via the A2A Client SDK (V2).
+
+        Args:
+            agent_type: "data_collector" | "analysis" | "trading"
+            query: 사용자 프롬프트 또는 직렬화된 입력
+            context_id: 상관관계 식별자 (thread/task)
+
+        Returns:
+            dict: 에이전트 표준 응답 (데이터 파트 포함 가능)
+        """
         agent_url = self.agent_urls.get(agent_type)
         if not agent_url:
             raise ValueError(f"Unknown agent type: {agent_type}")
@@ -576,11 +628,11 @@ class CustomSupervisorAgentA2A(AgentExecutor):
         context: RequestContext,
         event_queue: EventQueue,
     ) -> None:
-        """
-        Execute supervisor workflow using new A2A interface.
+        """Execute supervisor workflow using the standardized A2A interface.
 
-        Uses the standardized SupervisorA2AAgent which handles all sub-agent
-        orchestration internally.
+        - Parses input, handles status queries, or runs a full workflow.
+        - Streams intermediate updates via TaskUpdater when appropriate.
+        - Emits a final message/artifact on completion.
         """
         try:
             logger.info(
@@ -634,7 +686,7 @@ class CustomSupervisorAgentA2A(AgentExecutor):
             raise
 
     async def _process_input(self, context: RequestContext) -> dict:
-        """Process input from A2A request context."""
+        """Parse input from the A2A request context into standard dict."""
         query = context.get_user_input()
 
         # Try to parse structured data
@@ -654,7 +706,11 @@ class CustomSupervisorAgentA2A(AgentExecutor):
         updater: TaskUpdater,
         event_queue: EventQueue
     ) -> None:
-        """Send A2AOutput as A2A message parts."""
+        """Send an A2AOutput-like dict as Text/Data parts to the client.
+
+        - Maps ``text_content`` → TextPart, ``data_content`` → DataPart
+        - Uses updater.complete for final messages, otherwise enqueues events
+        """
         try:
             status = output.get("status", "working")
             text_content = output.get("text_content")
@@ -703,9 +759,7 @@ class CustomSupervisorAgentA2A(AgentExecutor):
         context: RequestContext,
         event_queue: EventQueue,
     ) -> None:
-        """
-        Cancel an ongoing task.
-        """
+        """Cancel an ongoing task and emit a TaskStatusUpdateEvent (final)."""
         logger.info(f"Cancelling task: {context.task_id}")
 
         if context.current_task:
@@ -724,7 +778,10 @@ class CustomSupervisorAgentA2A(AgentExecutor):
             logger.info(f"Task {context.context_id} cancelled")
 
     def get_agent_card(self, url: str):
-        """A2A AgentCard 생성"""
+        """A2A AgentCard 생성.
+
+        Docker 환경에서는 자동으로 컨테이너 기반 호스트명을 사용하여 URL을 보정한다.
+        """
         if os.getenv("IS_DOCKER", "false").lower() == "true":
             url = f"http://supervisor-agent:{os.getenv('AGENT_PORT', '8000')}"
 

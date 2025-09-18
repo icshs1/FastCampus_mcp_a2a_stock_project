@@ -10,14 +10,18 @@ from starlette.middleware.cors import CORSMiddleware
 
 
 def create_cors_enabled_app(a2a_app: A2AStarletteApplication) -> Starlette:
-    """
-    A2A 애플리케이션에 CORS를 적용한 Starlette 앱을 생성합니다.
+    """CORS가 적용된 Starlette 앱을 생성한다.
+
+    초보자 메모:
+        - 브라우저 환경에서 프런트엔드(예: Next.js)가 A2A 서버에 접근하려면
+          CORS 설정이 필요합니다. 개발 단계에서는 `*` 허용이 편리하지만,
+          배포 환경에서는 허용 Origin을 제한하세요.
 
     Args:
         a2a_app: A2A SDK로 생성된 Starlette 애플리케이션
 
     Returns:
-        CORS가 적용된 Starlette 앱
+        Starlette: CORS가 적용된 Starlette 앱
     """
     # A2A 앱 빌드
     built_a2a_app = a2a_app.build()
@@ -49,11 +53,7 @@ def create_cors_enabled_app(a2a_app: A2AStarletteApplication) -> Starlette:
 
 
 def get_cors_config() -> dict:
-    """
-    CORS 설정을 딕셔너리로 반환합니다.
-
-    uvicorn이나 다른 서버에서 직접 사용할 수 있는 형식입니다.
-    """
+    """uvicorn 등에서 직접 사용할 수 있는 CORS 설정 딕셔너리 반환."""
     return {
         "allow_origins": [
             "http://localhost:3000",

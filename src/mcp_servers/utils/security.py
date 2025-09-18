@@ -3,6 +3,12 @@
 
 민감한 정보 감지 및 마스킹 기능을 제공하는 보안 시스템입니다.
 로그 출력 시 자동으로 민감한 데이터를 필터링하여 보안을 강화합니다.
+
+Beginner notes:
+    - Masking levels: FULL (always mask), PARTIAL (first N chars), NONE.
+    - Environment-driven: ``ENVIRONMENT`` and ``LOG_MASKING_LEVEL`` control
+      defaults; you can override via env vars without code changes.
+    - Use ``configure_secure_logging`` at server startup to install processors.
 """
 
 import os

@@ -1,4 +1,10 @@
-"""MCP 서버 공통 검증 유틸리티."""
+"""MCP 서버 공통 검증 유틸리티.
+
+Beginner notes:
+    - All validators return ``ValidationResult`` with ``is_valid`` and either
+      ``validated_data`` or a Korean ``error_message`` for UI display.
+    - Price tick size is simplified for KRX; adjust units as needed.
+"""
 
 from typing import Any
 

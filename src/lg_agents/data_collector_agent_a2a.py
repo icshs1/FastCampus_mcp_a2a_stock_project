@@ -3,6 +3,12 @@ DataCollector Agent with A2A Integration.
 
 This module provides a DataCollector agent that implements the standardized
 A2A interface for seamless integration with the A2A protocol.
+
+Beginner notes:
+    - The agent emits streaming updates only when the internal buffer decides
+      the chunk is readable. Tiny token chunks are buffered to reduce noise.
+    - The final output includes counts (tool calls, collected symbols) so a
+      supervisor can quickly summarize progress without parsing free text.
 """
 
 from datetime import datetime
@@ -79,7 +85,16 @@ class DataCollectorA2AAgent(BaseA2AAgent, BaseGraphAgent):
         self.tool_calls_count = 0
 
     async def initialize(self):
-        """Initialize the agent with MCP tools and create the graph."""
+        """Initialize the agent with MCP tools and create the graph.
+
+        Steps:
+            1) Load domain-specific MCP tools for data collection
+            2) Create a tailored system prompt
+            3) Build a ReAct graph with checkpointing
+
+        Raises:
+            RuntimeError: Wrapping lower-level errors during tool/prompt/graph setup
+        """
         try:
             # Load MCP tools
             self.tools = await load_data_collector_tools()
@@ -115,8 +130,10 @@ class DataCollectorA2AAgent(BaseA2AAgent, BaseGraphAgent):
         Execute the agent with A2A-compatible input and output.
 
         Args:
-            input_dict: Input data containing messages or structured request
-            config: Optional configuration (thread_id, etc.)
+            input_dict: ``{"messages": [...]}`` payload or a structured
+                collection request. For messages, use LangChain message objects.
+            config: Optional execution config; a default ``thread_id`` is set
+                when not provided.
 
         Returns:
             A2AOutput: Standardized output for A2A processing
@@ -147,14 +164,9 @@ class DataCollectorA2AAgent(BaseA2AAgent, BaseGraphAgent):
         self,
         event: Dict[str, Any]
     ) -> Optional[A2AOutput]:
-        """
-        Convert a streaming event to standardized A2A output.
+        """Convert a LangGraph streaming event into an ``A2AOutput`` update.
 
-        Args:
-            event: Raw streaming event from LangGraph
-
-        Returns:
-            A2AOutput if the event should be forwarded, None otherwise
+        Returns ``None`` for small token chunks that remain buffered.
         """
         event_type = event.get("event", "")
 
@@ -226,14 +238,9 @@ class DataCollectorA2AAgent(BaseA2AAgent, BaseGraphAgent):
         self,
         state: Dict[str, Any]
     ) -> A2AOutput:
-        """
-        Extract final output from the agent's state.
+        """Create the final ``A2AOutput`` from the LangGraph run state.
 
-        Args:
-            state: Final state from the LangGraph execution
-
-        Returns:
-            A2AOutput: Final standardized output
+        Includes structured counters and timestamps for easy downstream use.
         """
         try:
             # Extract messages from state
@@ -289,17 +296,16 @@ class DataCollectorA2AAgent(BaseA2AAgent, BaseGraphAgent):
         user_question: str | None = None,
         context_id: str | None = None
     ) -> A2AOutput:
-        """
-        Helper method for data collection with specific parameters.
+        """Helper method for high-level data collection requests.
 
         Args:
-            symbols: Stock symbols to collect data for
-            data_types: Types of data to collect
-            user_question: Original user question
-            context_id: Context ID for threading
+            symbols: Target symbols (e.g., ["005930", "000660"]).
+            data_types: Data categories (e.g., ["price", "news"]).
+            user_question: If provided, overrides auto-built request text.
+            context_id: Threading context for reproducibility.
 
         Returns:
-            A2AOutput: Standardized collection result
+            A2AOutput: Standardized collection result.
         """
         # Build the collection request
         request = self._build_collection_request(symbols, data_types, user_question)
@@ -318,7 +324,7 @@ class DataCollectorA2AAgent(BaseA2AAgent, BaseGraphAgent):
         data_types: list[str] = None,
         user_question: str = None
     ) -> str:
-        """Build a structured collection request."""
+        """Build a concise, Korean instruction for the agent to collect data."""
         if user_question:
             return user_question
 

@@ -54,13 +54,12 @@ class AnalysisAgentA2A:
         self.executor = None  # A2A 프로토콜 호환 에이전트 실행기 (LangGraphAgentExecutor)
 
     async def initialize(self):
-        """
-        LangGraph Agent 및 A2A 래퍼 초기화
+        """LangGraph Agent 및 A2A 래퍼 초기화.
 
-        이 메서드는 다음 작업을 수행합니다:
-        1. A2A 호환 실행기 생성 (내부적으로 AnalysisAgent 생성)
-        2. MCP 서버와의 연결 및 도구 초기화
-        3. LangGraph 상태 그래프 검증
+        Steps:
+            1) Create A2A-compatible executor (constructs the LangGraph agent)
+            2) Initialize MCP tools if required
+            3) Validate compiled graph availability
 
         Returns:
             bool: 초기화 성공 시 True, 실패 시 False
@@ -79,14 +78,13 @@ class AnalysisAgentA2A:
             return False
 
     def get_agent_card(self, url: str):
-        """
-        A2A AgentCard 생성
+        """A2A AgentCard 생성.
 
-        AgentCard는 에이전트의 메타데이터와 기능을 설명하는 표준화된 문서입니다.
-        다른 에이전트나 시스템이 이 에이전트의 기능을 이해하고 상호작용할 수 있도록 합니다.
+        AgentCard는 에이전트의 메타데이터와 기능을 설명하는 표준화 문서로,
+        상호운용성과 자동 디스커버리를 위해 사용됩니다.
 
         Args:
-            url: 에이전트 서버의 기본 URL
+            url: 에이전트 서버의 기본 URL (Docker 환경에서는 컨테이너 호스트명 사용)
 
         Returns:
             AgentCard: 에이전트 메타데이터 카드
@@ -120,14 +118,9 @@ class AnalysisAgentA2A:
         )
 
 def main():
-    """
-    AnalysisAgent A2A 서버 실행
+    """AnalysisAgent A2A 서버 실행.
 
-    이 함수는 서버 실행의 진입점으로, 다음 작업을 수행합니다:
-    1. 로깅 설정
-    2. 비동기 초기화 실행
-    3. 환경 설정 로드
-    4. A2A 서버 생성 및 실행
+    서버 엔트리포인트로서 로깅/초기화/환경 로드 후 A2A 서버를 구동합니다.
     """
     # 로깅 설정 - INFO 레벨로 설정하여 중요한 정보만 출력
     logging.basicConfig(level=logging.INFO)

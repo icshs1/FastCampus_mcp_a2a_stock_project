@@ -71,7 +71,12 @@ class LangGraphAgentExecutorV2(AgentExecutor):
         logger.info(f" LangGraphAgentExecutorV2 initialized for {agent_class.__name__}")
 
     async def _ensure_agent_initialized(self):
-        """Ensure the agent is initialized."""
+        """Ensure the agent instance is created and initialized.
+
+        - Instantiates ``agent_class`` with provided kwargs
+        - Awaits optional ``initialize()`` hook on the agent
+        - Raises ``RuntimeError`` if initialization fails
+        """
         if not self.agent:
             try:
                 # Create agent instance
@@ -91,8 +96,10 @@ class LangGraphAgentExecutorV2(AgentExecutor):
         context: RequestContext,
         event_queue: EventQueue
     ) -> None:
-        """
-        Execute the A2A request using the standardized agent interface.
+        """Execute the A2A request using the standardized agent interface.
+
+        Orchestrates task lifecycle for blocking or streaming execution modes,
+        producing Parts-based messages compliant with the A2A SDK.
 
         Args:
             context: A2A request context
@@ -195,7 +202,11 @@ class LangGraphAgentExecutorV2(AgentExecutor):
         input_dict: Dict[str, Any],
         context_id: str,
     ) -> Message:
-        """Execute in blocking mode (no streaming)."""
+        """Execute in blocking mode (no streaming).
+
+        Calls the agent's ``execute_for_a2a`` and emits a single final
+        message with aggregated Parts.
+        """
         logger.info("Using blocking execution mode")
 
         try:
@@ -227,7 +238,11 @@ class LangGraphAgentExecutorV2(AgentExecutor):
         input_dict: Dict[str, Any],
         context_id: str,
     ) -> AsyncGenerator[Message, None]:
-        """Execute with streaming support."""
+        """Execute with streaming support.
+
+        Streams LangGraph events via the agent's ``format_stream_event``
+        until completion, then extracts final output from graph state.
+        """
         logger.info("Using streaming execution mode")
 
         try:
@@ -343,8 +358,7 @@ class LangGraphAgentExecutorV2(AgentExecutor):
         context: RequestContext,
         event_queue: EventQueue
     ) -> None:
-        """
-        Cancel an ongoing task.
+        """Cancel an ongoing task.
 
         Args:
             context: Request context
@@ -364,7 +378,11 @@ class LangGraphAgentExecutorV2(AgentExecutor):
     # Helper methods
 
     async def _process_input(self, context: RequestContext) -> Dict[str, Any]:
-        """Process input from request context."""
+        """Process user input and/or DataPart payload from request context.
+
+        Returns a standard dict with either structured payload (from DataPart)
+        or a minimal ``{"messages": [{"role": "user", "content": ...}]}``.
+        """
         query = context.get_user_input()
 
         # Try to get structured data from DataPart
@@ -389,14 +407,14 @@ class LangGraphAgentExecutorV2(AgentExecutor):
             return {"messages": []}
 
     def _is_blocking_mode(self, context: RequestContext) -> bool:
-        """Check if blocking mode is requested."""
+        """Check if blocking mode is requested via request configuration."""
         if hasattr(context, "request") and context.request:
             if hasattr(context.request, "configuration") and context.request.configuration:
                 return getattr(context.request.configuration, "blocking", False)
         return False
 
     def _is_completion_event(self, event: Dict[str, Any]) -> bool:
-        """Check if an event indicates completion."""
+        """Check if a LangGraph event implies completion of the workflow."""
         event_type = event.get("event", "")
 
         if event_type == "on_chain_end":
@@ -407,7 +425,7 @@ class LangGraphAgentExecutorV2(AgentExecutor):
         return False
 
     def _map_status_to_task_state(self, status: str) -> TaskState:
-        """Map A2AOutput status to TaskState."""
+        """Map A2AOutput status string to A2A TaskState enum."""
         mapping = {
             "working": TaskState.working,
             "completed": TaskState.completed,

@@ -60,13 +60,12 @@ class DataCollectorAgentA2A:
         self.executor = None  # A2A 프로토콜 호환 에이전트 실행기 (LangGraphAgentExecutor)
 
     async def initialize(self):
-        """
-        LangGraph Agent 및 A2A 래퍼 초기화
+        """LangGraph Agent 및 A2A 래퍼 초기화.
 
-        초기화 프로세스:
-            1. A2A 호환 실행기 생성 (내부적으로 DataCollectorAgent 생성)
-            2. MCP 서버 연결 및 도구 초기화
-            3. LangGraph 상태 그래프 검증
+        Steps:
+            1) A2A 호환 실행기 생성 (LangGraph agent 생성 포함)
+            2) MCP 서버 도구 초기화
+            3) 그래프/도구 유효성 검증
 
         Returns:
             bool: 초기화 성공 여부
@@ -88,7 +87,10 @@ class DataCollectorAgentA2A:
             return False
 
     def get_agent_card(self, url: str) -> AgentCard:
-        """A2A AgentCard 생성"""
+        """A2A AgentCard 생성.
+
+        Docker 환경 여부를 감지해 URL을 자동 보정한다.
+        """
         if os.getenv("IS_DOCKER", "false").lower() == "true":
             url = f"http://data-collector-agent:{os.getenv('AGENT_PORT', '8001')}"
         _skill = create_agent_skill(
@@ -118,7 +120,7 @@ class DataCollectorAgentA2A:
         return agent_card
 
 def main():
-    """DataCollectorAgent A2A 서버 실행"""
+    """DataCollectorAgent A2A 서버 실행."""
     # 로깅 설정
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)

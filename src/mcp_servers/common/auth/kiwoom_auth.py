@@ -3,6 +3,14 @@
 
 OAuth 토큰 관리를 중앙화하고 Redis를 활용한 토큰 캐싱을 제공합니다.
 여러 MCP 서버가 동일한 토큰을 공유할 수 있도록 합니다.
+
+Beginner notes:
+    - Redis optional: If Redis is unavailable, an in-process memory cache is
+      used automatically. This is fine for local dev but not for multi-process
+      deployments.
+    - Token shape: Kiwoom token endpoint returns ``token`` (not access_token)
+      and optionally ``expires_dt``. We normalize to ``TokenInfo``.
+    - Cache key: App key is SHA-256 hashed to avoid leaking secrets in Redis.
 """
 
 import hashlib

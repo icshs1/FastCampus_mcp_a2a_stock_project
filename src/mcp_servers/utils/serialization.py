@@ -4,6 +4,11 @@ Serialization helpers for consistent JSON-safe outputs.
 - Convert Decimal → float
 - Convert UUID → str
 - Convert datetime/date → ISO string
+
+Beginner notes:
+    - The conversion is recursive and safe for nested dict/list/tuple/set.
+    - Use this before returning arbitrary data in MCP responses to avoid
+      non-serializable types leaking to clients.
 """
 
 from __future__ import annotations

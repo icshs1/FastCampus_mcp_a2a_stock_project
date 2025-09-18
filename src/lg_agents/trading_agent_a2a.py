@@ -3,6 +3,14 @@ Trading Agent with A2A Integration.
 
 This module provides a Trading agent that implements the standardized
 A2A interface with Human-in-the-Loop approval for risk management.
+
+Beginner notes:
+    - Approval flow: High-risk operations return ``status='input_required'``
+      with an approval request payload. Clients must respond with
+      "approve/승인" or "reject/거부" as a follow-up message.
+    - Risk threshold: ``risk_threshold`` gates when approval is required.
+      Additional safeguards include large order detection and number of
+      simultaneous pending orders.
 """
 
 from datetime import datetime
@@ -93,7 +101,11 @@ class TradingA2AAgent(BaseA2AAgent, BaseGraphAgent):
         self.approval_status = "PENDING"
 
     async def initialize(self):
-        """Initialize the agent with MCP tools and create the graph."""
+        """Initialize the agent with MCP tools and create the graph.
+
+        Raises:
+            RuntimeError: If tools cannot be loaded or the graph fails to build.
+        """
         try:
             # Load MCP tools
             self.tools = await load_trading_tools()
@@ -131,8 +143,9 @@ class TradingA2AAgent(BaseA2AAgent, BaseGraphAgent):
         Includes Human-in-the-Loop approval for high-risk trades.
 
         Args:
-            input_dict: Input data containing trading request
-            config: Optional configuration (thread_id, etc.)
+            input_dict: Trading request (often ``{"messages": [...]}``).
+            config: Optional execution config; default ``thread_id`` is used
+                when omitted.
 
         Returns:
             A2AOutput: Standardized output for A2A processing
@@ -171,14 +184,9 @@ class TradingA2AAgent(BaseA2AAgent, BaseGraphAgent):
         self,
         event: Dict[str, Any]
     ) -> Optional[A2AOutput]:
-        """
-        Convert a streaming event to standardized A2A output.
+        """Translate LangGraph event to A2A streaming update.
 
-        Args:
-            event: Raw streaming event from LangGraph
-
-        Returns:
-            A2AOutput if the event should be forwarded, None otherwise
+        Emits human-friendly text for order/risk/portfolio phases.
         """
         event_type = event.get("event", "")
 
@@ -291,15 +299,7 @@ class TradingA2AAgent(BaseA2AAgent, BaseGraphAgent):
         self,
         state: Dict[str, Any]
     ) -> A2AOutput:
-        """
-        Extract final output from the agent's state.
-
-        Args:
-            state: Final state from the LangGraph execution
-
-        Returns:
-            A2AOutput: Final standardized output
-        """
+        """Create the final ``A2AOutput`` including risk and approval fields."""
         try:
             # Extract messages from state
             messages = state.get("messages", [])
@@ -366,7 +366,7 @@ class TradingA2AAgent(BaseA2AAgent, BaseGraphAgent):
     # Human-in-the-Loop methods
 
     def _requires_human_approval(self) -> bool:
-        """Check if human approval is required."""
+        """Return True when a human must approve before proceeding."""
         # Check VaR threshold
         if self.risk_metrics["var_ratio"] > self.risk_threshold:
             return True
@@ -383,7 +383,7 @@ class TradingA2AAgent(BaseA2AAgent, BaseGraphAgent):
         return False
 
     def _create_approval_request(self) -> A2AOutput:
-        """Create an approval request for human review."""
+        """Build an approval request output for human review."""
         approval_message = self._build_approval_message()
 
         return self.create_a2a_output(
@@ -405,7 +405,7 @@ class TradingA2AAgent(BaseA2AAgent, BaseGraphAgent):
         )
 
     def _build_approval_message(self) -> str:
-        """Build a human-readable approval message."""
+        """Create the human-facing message content for approval UI."""
         total_amount = sum(order.get("amount", 0) for order in self.pending_orders)
         var_ratio = self.risk_metrics["var_ratio"]
 
@@ -428,7 +428,7 @@ class TradingA2AAgent(BaseA2AAgent, BaseGraphAgent):
         return message
 
     def _is_approval_response(self, input_dict: Dict[str, Any]) -> bool:
-        """Check if the input is an approval response."""
+        """Detect whether the latest message contains an approval decision."""
         messages = input_dict.get("messages", [])
         if not messages:
             return False
@@ -441,7 +441,7 @@ class TradingA2AAgent(BaseA2AAgent, BaseGraphAgent):
         return False
 
     async def _handle_approval_response(self, input_dict: Dict[str, Any]) -> A2AOutput:
-        """Handle human approval response."""
+        """Apply a user's approval/denial decision and finalize output."""
         messages = input_dict.get("messages", [])
         response = messages[-1].content.lower() if messages else ""
 
@@ -477,7 +477,7 @@ class TradingA2AAgent(BaseA2AAgent, BaseGraphAgent):
     # Helper methods
 
     def _extract_symbols_from_orders(self) -> list[str]:
-        """Extract unique symbols from orders."""
+        """Return the unique set of symbols referenced by pending/executed orders."""
         symbols = set()
         for order in self.pending_orders + self.executed_trades:
             if "symbol" in order:
@@ -485,7 +485,7 @@ class TradingA2AAgent(BaseA2AAgent, BaseGraphAgent):
         return list(symbols)
 
     def _extract_trading_action(self, text: str) -> str:
-        """Extract trading action from text."""
+        """Parse BUY/SELL/HOLD intent from unstructured text."""
         text_lower = text.lower()
 
         if "매수" in text or "buy" in text_lower:
@@ -498,7 +498,7 @@ class TradingA2AAgent(BaseA2AAgent, BaseGraphAgent):
         return "PENDING"
 
     def _determine_risk_level(self) -> str:
-        """Determine risk level based on metrics."""
+        """Map VaR ratio to qualitative risk tiers."""
         var_ratio = self.risk_metrics["var_ratio"]
 
         if var_ratio > 0.20:
@@ -509,7 +509,7 @@ class TradingA2AAgent(BaseA2AAgent, BaseGraphAgent):
             return "LOW"
 
     def _get_approval_reason(self) -> str:
-        """Get the reason for requiring approval."""
+        """Explain why approval is required for the current state."""
         reasons = []
 
         if self.risk_metrics["var_ratio"] > self.risk_threshold:

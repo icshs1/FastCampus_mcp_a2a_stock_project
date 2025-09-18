@@ -2,6 +2,12 @@
 한국 주식시장 시간 관리 유틸리티
 
 한국 주식시장의 거래시간, 공휴일, 시간대별 특성을 반영하는 시간 관련 함수들을 제공합니다.
+
+Beginner notes:
+    - All times are normalized to KST (Asia/Seoul). Pass timezone-naive inputs
+      and they will be localized. Pass aware inputs and they will be converted.
+    - Holiday sets are static examples. For production, wire an official KRX
+      calendar provider or update yearly.
 """
 
 import random

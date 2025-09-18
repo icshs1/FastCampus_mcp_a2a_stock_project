@@ -3,6 +3,15 @@ Base HTTP client components for MCP servers.
 
 Provides simple, reusable components for making HTTP requests with
 rate limiting, circuit breaker pattern, and error handling.
+
+Beginner notes:
+    - Circuit breaker: Wrap async functions with ``SimpleCircuitBreaker.call``
+      to automatically open the circuit after repeated failures. You can also
+      manually mark outcomes via ``record_success()`` / ``record_failure()``.
+    - Rate limiter: ``SimpleRateLimiter.acquire()`` implements a sliding window
+      for per-second and per-hour limits. Always await it before requests.
+    - Async only: The helpers here are designed for async HTTP clients
+      (httpx.AsyncClient). For sync use, create a separate thin wrapper.
 """
 
 import asyncio
@@ -50,7 +59,12 @@ class SimpleCircuitBreaker:
         self.state = "CLOSED"  # CLOSED, OPEN, HALF_OPEN
 
     def call(self, func):
-        """Circuit Breaker를 통한 함수 호출."""
+        """Wrap an async function call with circuit breaker semantics.
+
+        The returned wrapper MUST be awaited. On success, resets the breaker;
+        on exception, increments failure count and opens the circuit when the
+        threshold is exceeded.
+        """
 
         async def wrapper(*args, **kwargs):
             if self.state == "OPEN":
@@ -70,12 +84,12 @@ class SimpleCircuitBreaker:
         return wrapper
 
     def _on_success(self):
-        """성공 시 호출."""
+        """Handle successful invocation: reset counters and close breaker."""
         self.failure_count = 0
         self.state = "CLOSED"
 
     def _on_failure(self):
-        """실패 시 호출."""
+        """Handle failed invocation: increment counters and open breaker."""
         self.failure_count += 1
         self.last_failure_time = time.time()
 
@@ -86,6 +100,15 @@ class SimpleCircuitBreaker:
                 failure_count=self.failure_count,
                 threshold=self.failure_threshold,
             )
+
+    # Convenience methods used by some higher-level clients
+    def record_success(self) -> None:
+        """Manually record a successful call outcome."""
+        self._on_success()
+
+    def record_failure(self) -> None:
+        """Manually record a failed call outcome."""
+        self._on_failure()
 
 
 class SimpleRateLimiter:
