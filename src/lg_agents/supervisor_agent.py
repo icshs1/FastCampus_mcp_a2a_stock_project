@@ -1,12 +1,13 @@
 """
-Sequential Multi-Node SupervisorAgent
+멀티 에이전트 Orchestrator SupervisorAgent
 
-BaseGraphAgent를 상속받고 조건부 엣지를 사용하여 하위 에이전트를 순차적으로 호출합니다.
-create_react_agent의 Tool 방식 문제를 해결하고 비동기 A2A 호출을 지원합니다.
+이 모듈의 SupervisorAgent 는 BaseGraphAgent 를 상속하며, 조건부 엣지를 사용해
+하위 에이전트를 순차적으로 호출합니다. 또한 create_react_agent 의 Tool 기반
+제약을 보완하고 비동기 A2A 호출을 지원합니다.
 
-Architecture:
+아키텍처:
     START → route → data_collector → analysis → trading → aggregate → END
-    (각 단계는 워크플로우 패턴에 따라 조건부로 실행됨)
+    (각 단계는 워크플로우 패턴에 따라 조건부로 실행됩니다)
 """
 
 from enum import Enum

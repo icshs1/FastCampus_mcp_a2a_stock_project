@@ -69,28 +69,28 @@ mcp_servers/
 │       ├── investor_domain.py      # 투자자 동향 (8033)
 │       └── portfolio_domain.py     # 포트폴리오 (8034)
 │
-├── financial_analysis_mcp/            # 📈 재무 분석 서버 (8040)
+├── financial_analysis_mcp/            # 재무 분석 서버 (8040)
 │   ├── server.py
 │   └── financial_client.py
 │
-├── stock_analysis_mcp/                # 📊 기술적 분석 서버 (8041)
+├── stock_analysis_mcp/                # 기술적 분석 서버 (8041)
 │   ├── server.py
 │   ├── stock_client.py
 │   └── korean_market.py
 │
-├── macroeconomic_analysis_mcp/        # 🌐 거시경제 서버 (8042)
+├── macroeconomic_analysis_mcp/        # 거시경제 서버 (8042)
 │   ├── server.py
 │   └── macro_client.py
 │
-├── naver_news_mcp/                    # 📰 뉴스 수집 서버 (8050)
+├── naver_news_mcp/                    # 뉴스 수집 서버 (8050)
 │   ├── server.py
 │   └── news_client.py
 │
-├── tavily_search_mcp/                 # 🔍 웹 검색 서버 (3020)
+├── tavily_search_mcp/                 # 웹 검색 서버 (3020)
 │   ├── server.py
 │   └── tavily_search_client.py
 │
-└── utils/                             # 🛠️ 유틸리티
+└── utils/                             # 유틸리티
     ├── env_validator.py              # 환경변수 검증
     ├── error_handler.py              # 에러 처리
     ├── formatters.py                 # 데이터 포맷터

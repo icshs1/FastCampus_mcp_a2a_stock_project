@@ -20,6 +20,7 @@ trading/
 ├── __init__.py                      # 패키지 초기화
 ├── __main__.py                      # A2A 서버 실행 엔트리포인트
 ├── trading_agent_a2a.py             # A2A TradingAgent 구현
+├── trading_agent_a2a_v2.py          # A2A TradingAgent V2 구현
 └── code_index.md                    # 이 문서
 ```
 

@@ -128,81 +128,35 @@ async def test_streaming_vs_polling(
     user_question: str,
     datacollector_url: str = "http://localhost:8001"
 ) -> Dict[str, Any]:
-    """스트리밍 vs 풀링 모드 비교 테스트"""
-    
+    """스트리밍 테스트 제거: 폴링(블로킹)만 수행"""
     input_data = {
         "requested_symbols": symbols,
         "data_types": data_types,
         "user_question": user_question,
     }
-    
-    results = {"streaming": None, "polling": None, "comparison": {}}
-    
-    print("   스트리밍 모드 테스트...")
-    start_time = time.time()
-    try:
-        async with A2AClientManagerV2(
-            base_url=datacollector_url, 
-            streaming=True,
-            retry_delay=2.0
-        ) as client_manager:
-            streaming_result = await client_manager.send_data_with_full_messages(input_data)
-            
-        streaming_duration = time.time() - start_time
-        results["streaming"] = {
-            "success": True,
-            "duration": streaming_duration,
-            "result": streaming_result if isinstance(streaming_result, list) else [streaming_result]
-        }
-        print(f"     스트리밍 완료 ({streaming_duration:.2f}초)")
-        
-    except Exception as e:
-        results["streaming"] = {
-            "success": False,
-            "duration": time.time() - start_time,
-            "error": str(e)
-        }
-        print(f"     스트리밍 실패: {str(e)}")
-    
     print("   풀링 모드 테스트...")
     start_time = time.time()
     try:
-        async with A2AClientManagerV2(
-            base_url=datacollector_url, 
-            streaming=False
-        ) as client_manager:
+        async with A2AClientManagerV2(base_url=datacollector_url, streaming=False) as client_manager:
             polling_result = await client_manager.send_data_with_full_messages(input_data)
-            
         polling_duration = time.time() - start_time
-        results["polling"] = {
-            "success": True,
-            "duration": polling_duration,
-            "result": polling_result if isinstance(polling_result, list) else [polling_result]
-        }
         print(f"     풀링 완료 ({polling_duration:.2f}초)")
-        
+        return {
+            "polling": {
+                "success": True,
+                "duration": polling_duration,
+                "result": polling_result if isinstance(polling_result, list) else [polling_result]
+            }
+        }
     except Exception as e:
-        results["polling"] = {
-            "success": False,
-            "duration": time.time() - start_time,
-            "error": str(e)
-        }
         print(f"     풀링 실패: {str(e)}")
-    
-    # 결과 비교
-    if results["streaming"]["success"] and results["polling"]["success"]:
-        streaming_final = results["streaming"]["result"][-1] if results["streaming"]["result"] else {}
-        polling_final = results["polling"]["result"][-1] if results["polling"]["result"] else {}
-        
-        results["comparison"] = {
-            "both_successful": True,
-            "speed_difference": results["polling"]["duration"] - results["streaming"]["duration"],
-            "content_consistency": streaming_final.get("status") == polling_final.get("status")
+        return {
+            "polling": {
+                "success": False,
+                "duration": time.time() - start_time,
+                "error": str(e)
+            }
         }
-        print(f"     성능 차이: 스트리밍이 {results['comparison']['speed_difference']:.2f}초 더 {'빠름' if results['comparison']['speed_difference'] > 0 else '느림'}")
-        print(f"     결과 일관성: {'일관됨' if results['comparison']['content_consistency'] else '불일치'}")
-    
-    return results
 
 
 async def run_a2a_interface_tests(
@@ -247,11 +201,7 @@ async def run_a2a_interface_tests(
         test_results["a2a_output_format"]["success"] = validation["valid"]
         test_results["a2a_output_format"]["details"] = validation
         
-        # format_stream_event 검증 (스트리밍 응답에서)
-        if isinstance(response, list) and len(response) > 1:
-            test_results["format_stream_event"]["tested"] = True
-            test_results["format_stream_event"]["success"] = True
-            print("     format_stream_event: 스트리밍 이벤트 감지됨")
+        # 스트리밍 제거: format_stream_event 테스트 제외
         
         # extract_final_output 검증 (최종 결과 추출)
         if final_response and "status" in final_response:
@@ -465,13 +415,7 @@ async def main() -> None:
             "test_type": "standard"
         },
         # ============== 통합 테스트 케이스 추가 ==============
-        {
-            "name": "스트리밍 vs 풀링 모드 비교 테스트",
-            "symbols": ["005930"],
-            "data_types": ["price", "info"],
-            "question": "삼성전자 기본 데이터를 수집해주세요.",
-            "test_type": "streaming_vs_polling"
-        },
+        
         {
             "name": "A2A 인터페이스 메서드 검증 테스트",
             "symbols": ["005930"],
@@ -513,28 +457,6 @@ async def main() -> None:
                     True, 
                     {"result_type": "standard_collection", "status": "completed"}
                 )
-                
-            elif test_type == "streaming_vs_polling":
-                # 스트리밍 vs 풀링 비교 테스트
-                print_section("스트리밍 vs 풀링 모드 비교")
-                comparison_result = await test_streaming_vs_polling(
-                    symbols=test_case["symbols"],
-                    data_types=test_case["data_types"],
-                    user_question=test_case["question"]
-                )
-                
-                # 테스트 결과 기록
-                both_successful = (
-                    comparison_result["streaming"] and comparison_result["streaming"]["success"] and
-                    comparison_result["polling"] and comparison_result["polling"]["success"]
-                )
-                test_result.add_test_result(
-                    test_case["name"],
-                    both_successful,
-                    comparison_result
-                )
-                
-                result = comparison_result  # 저장을 위해
                 
             elif test_type == "a2a_interface":
                 # A2A 인터페이스 메서드 검증 테스트

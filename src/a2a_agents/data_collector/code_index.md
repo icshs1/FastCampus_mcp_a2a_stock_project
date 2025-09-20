@@ -20,14 +20,16 @@ data_collector/
 ├── __init__.py                          # 패키지 초기화
 ├── __main__.py                          # A2A 서버 실행 엔트리포인트
 ├── data_collector_agent_a2a.py          # A2A DataCollectorAgent 구현
+├── data_collector_agent_a2a_v2.py       # A2A DataCollectorAgent V2 구현
 └── code_index.md                        # 이 문서
 ```
 
-## 📊 DataCollectorAgent A2A 구현
+## DataCollectorAgent A2A 구현
 
-### 🎯 **data_collector_agent_a2a.py** - 데이터 수집 오케스트레이터
+### **data_collector_agent_a2a.py** - 데이터 수집 오케스트레이터
 
 #### 주요 기능
+
 ```python
 async def build_server(app: str, llm: str) -> ASGIApplication:
     """DataCollectorAgent A2A 서버 빌드
@@ -44,12 +46,14 @@ async def build_server(app: str, llm: str) -> ASGIApplication:
 ```
 
 #### 핵심 역할
+
 1. **멀티소스 수집**: 5개 MCP 도메인 서버에서 데이터 수집
 2. **데이터 검증**: 수집된 데이터의 품질 및 완전성 검증
 3. **표준화**: 다양한 소스의 데이터를 표준 형식으로 변환
 4. **품질 평가**: 데이터 품질 점수 계산 (0.0~1.0)
 
 #### LangGraph 통합
+
 ```python
 from src.lg_agents.data_collector_agent import DataCollectorAgent
 from src.a2a_integration import LangGraphAgentExecutor
@@ -72,6 +76,7 @@ executor = LangGraphAgentExecutor(
 ### 📡 데이터 소스 (MCP 서버 연동)
 
 #### 연동 MCP 서버 목록
+
 | MCP 서버 | 포트 | 수집 데이터 |
 |---------|------|------------|
 | `market_domain` | 8031 | 실시간 시세, 차트, 거래량 |
@@ -81,6 +86,7 @@ executor = LangGraphAgentExecutor(
 | `tavily_search_mcp` | 3020 | 웹 검색, 소셜 미디어 |
 
 #### 데이터 수집 워크플로우
+
 ```mermaid
 graph TB
     Request[수집 요청] --> Parse[요청 파싱]
@@ -99,9 +105,10 @@ graph TB
     Quality --> Response[응답 반환]
 ```
 
-### 🚀 **__main__.py** - 서버 실행
+### 🚀 ****main**.py** - 서버 실행
 
 #### 실행 방법
+
 ```bash
 # 직접 실행
 python -m src.a2a_agents.data_collector
@@ -113,6 +120,7 @@ python -m src.a2a_agents.data_collector
 ```
 
 #### 기본 설정
+
 - **포트**: 8101 (기본값)
 - **호스트**: localhost
 - **타임아웃**: 30초
@@ -120,6 +128,7 @@ python -m src.a2a_agents.data_collector
 ### 📡 A2A 엔드포인트
 
 #### **POST /agent/invoke** - 데이터 수집 요청
+
 ```json
 {
     "stock_code": "005930",
@@ -134,6 +143,7 @@ python -m src.a2a_agents.data_collector
 ```
 
 #### 응답 형식
+
 ```json
 {
     "status": "success",
@@ -207,6 +217,7 @@ VALIDATE_DATA=true                  # 데이터 검증 활성화
 ### 📊 데이터 품질 평가
 
 #### 품질 점수 계산 기준
+
 ```python
 def calculate_quality_score(data: Dict) -> float:
     """데이터 품질 점수 계산
@@ -223,6 +234,7 @@ def calculate_quality_score(data: Dict) -> float:
 ```
 
 #### 품질 임계값
+
 - **0.9 이상**: Excellent - 모든 분석에 적합
 - **0.7 ~ 0.9**: Good - 일반 분석 가능
 - **0.5 ~ 0.7**: Fair - 제한적 사용
@@ -231,6 +243,7 @@ def calculate_quality_score(data: Dict) -> float:
 ### 🔄 데이터 수집 전략
 
 #### 순차 수집 (Sequential)
+
 ```python
 # 의존성이 있는 데이터 순차 수집
 market_data = await collect_market_data()
@@ -239,6 +252,7 @@ if market_data.volume > threshold:
 ```
 
 #### 병렬 수집 (Parallel)
+
 ```python
 # 독립적인 데이터 병렬 수집
 tasks = [
@@ -252,6 +266,7 @@ results = await asyncio.gather(*tasks)
 ### 🔍 에러 처리
 
 #### 재시도 전략
+
 ```python
 @retry(max_attempts=3, backoff=2.0)
 async def collect_with_retry(source: str):
@@ -264,6 +279,7 @@ async def collect_with_retry(source: str):
 ```
 
 #### 부분 실패 처리
+
 - 일부 소스 실패 시 가용한 데이터만으로 응답
 - 품질 점수에 실패한 소스 반영
 - 에러 메타데이터 포함
@@ -271,11 +287,13 @@ async def collect_with_retry(source: str):
 ### 🧪 테스팅
 
 #### 유닛 테스트
+
 ```bash
 pytest tests/a2a_agents/data_collector/test_data_collector.py
 ```
 
 #### 통합 테스트
+
 ```python
 async def test_data_collection():
     response = await query_a2a_agent(
@@ -291,12 +309,14 @@ async def test_data_collection():
 ### 📈 모니터링
 
 #### 수집 메트릭
+
 - 평균 수집 시간
 - 소스별 성공률
 - 데이터 품질 점수 분포
 - 캐시 히트율
 
 #### Health Check
+
 ```bash
 curl http://localhost:8101/health
 ```
@@ -304,11 +324,13 @@ curl http://localhost:8101/health
 ### 💾 캐싱 전략
 
 #### 캐시 레이어
+
 1. **메모리 캐시**: 자주 요청되는 데이터 (TTL: 5분)
 2. **Redis 캐시**: 중기 데이터 저장 (TTL: 1시간)
 3. **데이터베이스**: 히스토리 데이터 영구 저장
 
 #### 캐시 무효화
+
 - 실시간 데이터: 즉시 무효화
 - 뉴스/공시: 새 항목 발견 시
 - 재무 데이터: 분기별 업데이트

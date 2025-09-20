@@ -34,7 +34,6 @@ src/
 │       ├── base_graph_agent.py    # BaseGraphAgent 추상 클래스
 │       ├── base_graph_state.py    # BaseState 상태 관리
 │       ├── error_handling.py      # 에러 처리 데코레이터
-│       ├── interrupt_manager.py   # 인터럽트 관리자
 │       ├── mcp_config.py          # MCP 설정 관리
 │       ├── mcp_loader.py          # MCP 도구 로더
 │       └── code_index.md
@@ -142,11 +141,13 @@ src/
 ├── a2a_integration/              # 🌐 A2A-LangGraph 브리지
 │   ├── __init__.py
 │   ├── code_index.md
-│   ├── executor.py               # LangGraphAgentExecutor 핵심 실행기
-│   ├── executor.py.bak           # 백업 파일
+│   ├── executor.py               # LangGraphAgentExecutor
+│   ├── executor_v2.py            # LangGraphAgentExecutor V2
 │   ├── generic_executor.py       # 범용 실행기
 │   ├── models.py                 # 설정 모델 정의
 │   ├── a2a_lg_client_utils.py    # A2A 클라이언트 유틸리티
+│   ├── a2a_lg_client_utils_v2.py # A2A 클라이언트 유틸 V2
+│   ├── cors_utils.py             # CORS/보안 유틸리티
 │   ├── a2a_lg_utils.py           # A2A 서버 빌드 유틸리티
 │   └── auth/                     # 인증 모듈
 │       ├── __init__.py
@@ -171,12 +172,14 @@ src/
     │   ├── __init__.py
     │   ├── __main__.py
     │   ├── code_index.md
-    │   └── analysis_agent_a2a.py
+    │   ├── analysis_agent_a2a.py
+    │   └── analysis_agent_a2a_v2.py
     └── trading/                  # A2A TradingAgent
         ├── __init__.py
         ├── __main__.py
         ├── code_index.md
-        └── trading_agent_a2a.py
+        ├── trading_agent_a2a.py
+        └── trading_agent_a2a_v2.py
 ```
 
 ## 📊 시스템 아키텍처 개요

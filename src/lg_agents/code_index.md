@@ -29,7 +29,6 @@ lg_agents/
     ├── base_graph_agent.py        # BaseGraphAgent 추상 클래스
     ├── base_graph_state.py        # 상태 관리 TypedDict
     ├── error_handling.py          # 에러 처리 데코레이터
-    ├── interrupt_manager.py       # 인터럽트 관리
     ├── mcp_config.py              # MCP 설정 관리
     ├── mcp_loader.py              # MCP 도구 로더
     └── code_index.md
@@ -40,11 +39,13 @@ lg_agents/
 ### 1️⃣ **SupervisorAgent** (`supervisor_agent.py`)
 
 #### 주요 클래스
+
 - `SupervisorAgent`: 메인 오케스트레이터 클래스
 - `SendSupervisorState`: Supervisor에게 전송되는 상태
 - `WorkflowPattern`: 워크플로우 패턴 정의 (ENUM)
 
 #### 워크플로우 노드 (10개)
+
 1. `initialize` - 초기화
 2. `parse_request` - 사용자 요청 파싱
 3. `plan_workflow` - 워크플로우 계획
@@ -57,6 +58,7 @@ lg_agents/
 10. `finalize` - 최종화
 
 #### 주요 기능
+
 - LLM 기반 사용자 요청 해석
 - 순차/병렬 실행 전략 결정
 - Agent 간 조정 및 조율
@@ -65,9 +67,11 @@ lg_agents/
 ### 2️⃣ **DataCollectorAgent** (`data_collector_agent.py`)
 
 #### 주요 클래스
+
 - `DataCollectorAgent`: 데이터 수집 에이전트
 
 #### 워크플로우 노드 (8개)
+
 1. `initialize` - 초기화
 2. `parse_request` - 요청 파싱
 3. `collect_market_data` - 시장 데이터 수집
@@ -78,6 +82,7 @@ lg_agents/
 8. `finalize` - 최종화
 
 #### MCP 서버 연동
+
 - `market_domain` (8031): 실시간 시세
 - `info_domain` (8032): 종목 정보
 - `investor_domain` (8033): 투자자 동향
@@ -85,6 +90,7 @@ lg_agents/
 - `tavily_search_mcp` (3020): 웹 검색
 
 #### 주요 기능
+
 - 멀티소스 데이터 수집
 - 데이터 품질 점수 계산 (0.0~1.0)
 - 데이터 표준화 및 정제
@@ -93,9 +99,11 @@ lg_agents/
 ### 3️⃣ **AnalysisAgent** (`analysis_agent.py`)
 
 #### 주요 클래스
+
 - `AnalysisAgent`: 투자 분석 에이전트
 
 #### 워크플로우 노드 (9개)
+
 1. `initialize` - 초기화
 2. `prepare_data` - 데이터 준비
 3. `technical_analysis` - 기술적 분석
@@ -107,12 +115,14 @@ lg_agents/
 9. `finalize` - 최종화
 
 #### 분석 방법론
+
 - **Technical**: RSI, MACD, Bollinger Bands, 이동평균
 - **Fundamental**: PER, PBR, ROE, 부채비율
 - **Sentiment**: 뉴스 감성, 투자자 심리
 - **Macro**: GDP, 금리, 환율, 경제지표
 
 #### 시그널 시스템
+
 - 카테고리 기반: `STRONG_BUY | BUY | HOLD | SELL | STRONG_SELL`
 - 가중평균 통합 점수
 - 신뢰도 계산 (0.0~1.0)
@@ -120,9 +130,11 @@ lg_agents/
 ### 4️⃣ **TradingAgent** (`trading_agent.py`)
 
 #### 주요 클래스
+
 - `TradingAgent`: 거래 실행 에이전트
 
 #### 워크플로우 노드 (9개)
+
 1. `initialize` - 초기화
 2. `strategy_formation` - 전략 수립
 3. `portfolio_optimization` - 포트폴리오 최적화
@@ -134,16 +146,19 @@ lg_agents/
 9. `finalize` - 최종화
 
 #### MCP 서버 연동
+
 - `trading_domain` (8030): 주문 실행
 - `portfolio_domain` (8034): 포트폴리오 관리
 
 #### 리스크 관리
+
 - VaR (Value at Risk) 계산
 - 포지션 사이즈 최적화
 - 손절/익절 전략
 - Human-in-the-Loop 트리거
 
 #### Human-in-the-Loop 조건
+
 - 고위험 거래 (VaR > 임계값)
 - 대규모 포지션 변경
 - 신뢰도 낮은 신호
@@ -154,42 +169,44 @@ lg_agents/
 ### **base/** 디렉토리
 
 #### `base_graph_agent.py`
+
 - `BaseGraphAgent`: 모든 에이전트의 추상 기반 클래스
 - StateGraph 빌드 메서드
 - 공통 노드 구현
 - 에러 처리 로직
 
 #### `base_graph_state.py`
+
 - `BaseState`: 기본 상태 TypedDict
 - 공통 상태 필드 정의
 - 상태 전이 관리
 
 #### `mcp_loader.py`
+
 - MCP 도구 동적 로딩
 - 도구 레지스트리 관리
 - 도구 검증 및 초기화
 
 #### `mcp_config.py`
+
 - MCP 서버 설정 관리
 - 포트 매핑
 - 환경 변수 로드
 
-#### `interrupt_manager.py`
-- 인터럽트 처리
-- Human-in-the-Loop 관리
-- 타임아웃 처리
-
 #### `error_handling.py`
+
 - 에러 처리 데코레이터
 - 재시도 로직
 - 에러 로깅
 
 ### **prompts.py**
+
 - 에이전트별 시스템 프롬프트
 - 태스크 프롬프트 템플릿
 - Few-shot 예제
 
 ### **util.py**
+
 - 공통 유틸리티 함수
 - 데이터 변환 헬퍼
 - 시간대 처리

@@ -1,8 +1,7 @@
-#!/usr/bin/env python3
 """
-SupervisorAgent A2A 서버 - V2 (표준 A2A 인터페이스 사용)
+SupervisorAgent A2A 서버 - V2
 
-새로운 표준화된 A2A 인터페이스를 사용하여 SupervisorAgent를 A2A 프로토콜로 제공합니다.
+A2A 인터페이스를 사용하여 SupervisorAgent를 A2A 프로토콜로 제공합니다.
 스트리밍과 풀링을 통합하여 처리하고, 표준화된 출력 형식을 사용합니다.
 """
 import json

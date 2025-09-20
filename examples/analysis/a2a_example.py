@@ -395,14 +395,116 @@ def parse_analysis_response(response_text: str):
 
 def format_analysis_result(result: Dict[str, Any]):
     """분석 결과 포맷팅 및 출력 (Analysis Agent 전용 구조)"""
-    
-    # A2A Analysis Agent 결과 구조 처리
+
+    # A2AOutput 표준 구조 처리 (text_content, data_content 우선 확인)
+    text_content = result.get("text_content")
+    data_content = result.get("data_content")
+    # 루트에 status/final이 있으면 우선 신뢰
+    status = result.get("status")
+    final = result.get("final")
+
+    # JSON으로 요약 구조화 출력 헬퍼
+    def print_structured_summary(dc: Dict[str, Any]):
+        summary = dc.get("result", {}) if isinstance(dc, dict) else {}
+        signal = summary.get("analysis_signal")
+        tech = summary.get("technical_score")
+        fund = summary.get("fundamental_score")
+        senti = summary.get("sentiment_score")
+        macro = summary.get("macro_score")
+        comp = summary.get("composite_score")
+        conf = summary.get("confidence_level")
+        print("\n 요약(구조화 데이터):")
+        print(f"  - Signal: {signal}")
+        print(f"  - Scores: technical={tech}, fundamental={fund}, sentiment={senti}, macro={macro}")
+        print(f"  - Composite: {comp}, Confidence: {conf}")
+
+    # text_content가 있으면 이를 우선 사용
+    if text_content and text_content.strip():
+        print(" 주식 데이터 통합 분석 완료!")
+        print("\n Agent 응답:")
+        print("-" * 50)
+
+        # 분석 내용을 줄 단위로 출력
+        lines = text_content.split("\n")
+        for line in lines[:30]:
+            if line.strip():
+                print(f"  {line}")
+
+        if len(lines) > 30:
+            print("\n  ... (더 많은 내용은 JSON 파일 참조)")
+
+        # 메타데이터 (A2AOutput 표준)
+        metadata = result.get("metadata", {})
+        print("\n 메타데이터:")
+        print(f"  - Agent 타입: {result.get('agent_type', 'AnalysisA2AAgent')}")
+        print(f"  - 최종 신호: {metadata.get('final_signal', 'N/A')}")
+        print(f"  - 신뢰도: {metadata.get('confidence', 'N/A')}")
+        print(f"  - 실행 상태: {metadata.get('execution_complete', 'N/A')}")
+
+        # 구조화 요약 추가
+        if data_content:
+            print_structured_summary(data_content)
+
+        return
+
+    # data_content에서 분석 내용 추출 시도 (루트가 비어 있을 때)
+    if data_content and isinstance(data_content, dict):
+        # data_content.result.raw_analysis에서 분석 내용 추출
+        raw_analysis = None
+        if data_content.get("result", {}).get("raw_analysis"):
+            raw_analysis = data_content["result"]["raw_analysis"]
+
+        if raw_analysis and raw_analysis.strip():
+            print(" 주식 데이터 통합 분석 완료! (Data Content)")
+            print("\n Agent 응답:")
+            print("-" * 50)
+
+            # 분석 내용을 줄 단위로 출력
+            lines = raw_analysis.split("\n")
+            for line in lines[:30]:
+                if line.strip():
+                    print(f"  {line}")
+
+            if len(lines) > 30:
+                print("\n  ... (더 많은 내용은 JSON 파일 참조)")
+
+            # 메타데이터
+            metadata = result.get("metadata", {})
+            print("\n 메타데이터:")
+            print(f"  - Agent 타입: {result.get('agent_type', 'AnalysisA2AAgent')}")
+            print(f"  - 최종 신호: {metadata.get('final_signal', data_content.get('result', {}).get('analysis_signal', 'N/A'))}")
+            print(f"  - 신뢰도: {metadata.get('confidence', 'N/A')}")
+            print(f"  - 실행 상태: {metadata.get('execution_complete', 'N/A')} / status={status} final={final}")
+
+            print_structured_summary(data_content)
+
+            return
+
+    # A2A Analysis Agent 결과 구조 처리 (data_parts 백업)
     if "data_parts" in result:
         data_parts = result.get("data_parts", [])
         if data_parts and isinstance(data_parts, list) and len(data_parts) > 0:
-            # 첫 번째 DataPart에서 분석 결과 추출
+            # 첫 번째 DataPart에서 분석 결과 추출 (직접/raw 경로 모두 시도)
             first_data_part = data_parts[0]
-            
+            # 1) raw 경로
+            raw = first_data_part.get("result", {}).get("raw_analysis")
+            if raw and isinstance(raw, str) and raw.strip():
+                print(" 주식 데이터 통합 분석 완료! (DataPart)")
+                print("\n Agent 응답:")
+                print("-" * 50)
+                for line in raw.split("\n")[:30]:
+                    if line.strip():
+                        print(f"  {line}")
+                meta = result.get("metadata", {})
+                signal = meta.get("final_signal", first_data_part.get("result", {}).get("analysis_signal"))
+                print("\n 메타데이터:")
+                print(f"  - Agent 타입: {result.get('agent_type', 'AnalysisA2AAgent')}")
+                print(f"  - 최종 신호: {signal or 'N/A'}")
+                print(f"  - 신뢰도: {meta.get('confidence', 'N/A')}")
+                print(f"  - 실행 상태: {meta.get('execution_complete', 'N/A')} / status={status} final={final}")
+                print_structured_summary(first_data_part)
+                return
+
             # 실제 데이터 구조: data_parts[0].analysis_result.analysis_result.messages
             analysis_result = first_data_part.get("analysis_result", {})
             nested_analysis = analysis_result.get("analysis_result", {})

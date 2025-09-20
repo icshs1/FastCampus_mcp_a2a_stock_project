@@ -20,14 +20,16 @@ analysis/
 ├── __init__.py                      # 패키지 초기화
 ├── __main__.py                      # A2A 서버 실행 엔트리포인트
 ├── analysis_agent_a2a.py            # A2A AnalysisAgent 구현
+├── analysis_agent_a2a_v2.py         # A2A AnalysisAgent V2 구현
 └── code_index.md                    # 이 문서
 ```
 
-## 📊 AnalysisAgent A2A 구현
+## AnalysisAgent A2A 구현
 
-### 🎯 **analysis_agent_a2a.py** - 통합 분석 엔진
+### **analysis_agent_a2a.py** - 통합 분석 엔진
 
 #### 주요 기능
+
 ```python
 async def build_server(app: str, llm: str) -> ASGIApplication:
     """AnalysisAgent A2A 서버 빌드
@@ -44,12 +46,14 @@ async def build_server(app: str, llm: str) -> ASGIApplication:
 ```
 
 #### 핵심 역할
+
 1. **기술적 분석 (Technical)**: 차트 패턴, 지표 분석
 2. **기본적 분석 (Fundamental)**: 재무제표, 가치평가
 3. **감성 분석 (Sentiment)**: 뉴스, 소셜미디어 감성
 4. **거시경제 분석 (Macro)**: 경제지표, 산업 동향
 
 #### LangGraph 통합
+
 ```python
 from src.lg_agents.analysis_agent import AnalysisAgent
 from src.a2a_integration import LangGraphAgentExecutor
@@ -74,6 +78,7 @@ executor = LangGraphAgentExecutor(
 #### 1️⃣ **Technical Analysis** - 기술적 분석
 
 ##### 분석 지표
+
 ```python
 TECHNICAL_INDICATORS = {
     "trend": ["SMA", "EMA", "MACD"],
@@ -85,6 +90,7 @@ TECHNICAL_INDICATORS = {
 ```
 
 ##### 신호 생성
+
 ```python
 def generate_technical_signal(indicators: Dict) -> str:
     """기술적 지표 기반 신호 생성
@@ -97,6 +103,7 @@ def generate_technical_signal(indicators: Dict) -> str:
 #### 2️⃣ **Fundamental Analysis** - 기본적 분석
 
 ##### 재무 지표
+
 ```python
 FUNDAMENTAL_METRICS = {
     "valuation": ["PER", "PBR", "PSR", "EV/EBITDA"],
@@ -108,6 +115,7 @@ FUNDAMENTAL_METRICS = {
 ```
 
 ##### 가치 평가
+
 ```python
 def calculate_fair_value(financials: Dict) -> float:
     """DCF, 멀티플 방식으로 적정 주가 계산
@@ -123,12 +131,14 @@ def calculate_fair_value(financials: Dict) -> float:
 #### 3️⃣ **Sentiment Analysis** - 감성 분석
 
 ##### 데이터 소스
+
 - 뉴스 헤드라인 및 본문
 - 애널리스트 리포트
 - 소셜 미디어 (Twitter, Reddit)
 - 공시 및 IR 자료
 
 ##### 감성 점수
+
 ```python
 def calculate_sentiment_score(texts: List[str]) -> float:
     """텍스트 감성 점수 계산
@@ -143,6 +153,7 @@ def calculate_sentiment_score(texts: List[str]) -> float:
 #### 4️⃣ **Macro Analysis** - 거시경제 분석
 
 ##### 분석 요소
+
 ```python
 MACRO_FACTORS = {
     "economic": ["GDP", "Interest Rate", "Inflation"],
@@ -174,9 +185,10 @@ graph TB
     Confidence --> Response[분석 결과]
 ```
 
-### 🚀 **__main__.py** - 서버 실행
+### 🚀 ****main**.py** - 서버 실행
 
 #### 실행 방법
+
 ```bash
 # 직접 실행
 python -m src.a2a_agents.analysis
@@ -188,6 +200,7 @@ python -m src.a2a_agents.analysis
 ```
 
 #### 기본 설정
+
 - **포트**: 8102 (기본값)
 - **호스트**: localhost
 - **신뢰도 임계값**: 0.7
@@ -195,6 +208,7 @@ python -m src.a2a_agents.analysis
 ### 📡 A2A 엔드포인트
 
 #### **POST /agent/invoke** - 분석 요청
+
 ```json
 {
     "stock_code": "005930",
@@ -213,6 +227,7 @@ python -m src.a2a_agents.analysis
 ```
 
 #### 응답 형식
+
 ```json
 {
     "status": "success",
@@ -293,6 +308,7 @@ MCP_STOCK_ANALYSIS_URL=http://localhost:8041
 ### 📊 신호 통합 시스템
 
 #### 카테고리 기반 신호
+
 ```python
 class InvestmentSignal(Enum):
     STRONG_BUY = "강력 매수"    # Score > 0.8
@@ -303,6 +319,7 @@ class InvestmentSignal(Enum):
 ```
 
 #### 가중평균 계산
+
 ```python
 def calculate_weighted_signal(signals: Dict[str, Signal]) -> Signal:
     """4차원 신호를 가중평균으로 통합
@@ -313,6 +330,7 @@ def calculate_weighted_signal(signals: Dict[str, Signal]) -> Signal:
 ```
 
 #### 신뢰도 계산
+
 ```python
 def calculate_confidence(analysis_results: Dict) -> float:
     """분석 신뢰도 계산
@@ -328,6 +346,7 @@ def calculate_confidence(analysis_results: Dict) -> float:
 ### 🔍 리스크 평가
 
 #### 리스크 요인 분석
+
 - **시장 리스크**: 베타, 변동성
 - **유동성 리스크**: 거래량, 스프레드
 - **신용 리스크**: 부채비율, 신용등급
@@ -335,6 +354,7 @@ def calculate_confidence(analysis_results: Dict) -> float:
 - **규제 리스크**: 정책 변화
 
 #### VaR 계산
+
 ```python
 def calculate_var(returns: List[float], confidence: float = 0.95) -> float:
     """Value at Risk 계산
@@ -346,11 +366,13 @@ def calculate_var(returns: List[float], confidence: float = 0.95) -> float:
 ### 🧪 테스팅
 
 #### 유닛 테스트
+
 ```bash
 pytest tests/a2a_agents/analysis/test_analysis_agent.py
 ```
 
 #### 백테스팅
+
 ```python
 async def backtest_analysis():
     """과거 데이터로 분석 정확도 검증"""
@@ -363,11 +385,13 @@ async def backtest_analysis():
 ### 📈 성능 메트릭
 
 #### 분석 정확도
+
 - 신호 정확도: 방향성 예측 정확도
 - 수익률: 신호 따른 수익률
 - 샤프 비율: 위험 조정 수익률
 
 #### 실행 성능
+
 - 평균 분석 시간: < 5초
 - 동시 처리 가능: 10개 종목
 - 메모리 사용: < 1GB

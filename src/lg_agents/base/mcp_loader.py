@@ -12,47 +12,16 @@ LangGraph Agent에서 사용할 도구를 로드합니다.
 
 import asyncio
 import logging
-import os
 from difflib import get_close_matches
 
 from langchain_core.tools import BaseTool
-from langchain_mcp_adapters.client import MultiServerMCPClient, load_mcp_tools
+
+from src.lg_agents.base.mcp_config import (
+    MCPServerConfig,
+    create_mcp_client_and_tools,
+)
 
 logger = logging.getLogger(__name__)
-
-# MCP 서버 URL 매핑
-# Docker 환경에서는 컨테이너 이름으로 접근
-
-# Docker 환경인지 확인 (IS_DOCKER 환경변수로 통일)
-IS_DOCKER = os.getenv("IS_DOCKER", "false").lower() == "true"
-
-# 로그 출력
-if IS_DOCKER:
-    logger.info("Docker environment detected (IS_DOCKER=true) - using container names for MCP servers")
-else:
-    logger.info("Local environment detected - using localhost for MCP servers")
-
-# Docker 환경에서는 컨테이너 이름 사용, 로컬에서는 localhost 사용
-FINANCIAL_HOST = "financial-analysis-mcp" if IS_DOCKER else "localhost"
-NEWS_HOST = "naver-news-mcp" if IS_DOCKER else "localhost"
-TAVILY_HOST = "tavily-search-mcp" if IS_DOCKER else "localhost"
-MACRO_HOST = "macroeconomic-analysis-mcp" if IS_DOCKER else "localhost"
-
-MCP_SERVER_MAPPING = {
-    # Kiwoom 도메인 서버
-    "kiwoom-info-mcp": f"http://{'kiwoom-info-mcp' if IS_DOCKER else 'localhost'}:8032/mcp",
-    "kiwoom-market-mcp": f"http://{'kiwoom-market-mcp' if IS_DOCKER else 'localhost'}:8031/mcp",
-    "kiwoom-trading-mcp": f"http://{'kiwoom-trading-mcp' if IS_DOCKER else 'localhost'}:8030/mcp",
-    "kiwoom-investor-mcp": f"http://{'kiwoom-investor-mcp' if IS_DOCKER else 'localhost'}:8033/mcp",
-    "kiwoom-portfolio-mcp": f"http://{'kiwoom-portfolio-mcp' if IS_DOCKER else 'localhost'}:8034/mcp",
-    # 외부 분석 서버
-    "financial-analysis-mcp": f"http://{FINANCIAL_HOST}:8040/mcp",
-    "stock-analysis-mcp": f"http://{'stock-analysis-mcp' if IS_DOCKER else 'localhost'}:8042/mcp",
-    "macroeconomic-analysis-mcp": f"http://{MACRO_HOST}:8041/mcp",
-    "naver-news-mcp": f"http://{NEWS_HOST}:8050/mcp",
-    "tavily-search-mcp": f"http://{TAVILY_HOST}:3020/mcp",
-}
-
 
 def get_mcp_server_url(server_name: str) -> str:
     """MCP 서버 이름으로 URL 조회
@@ -63,7 +32,9 @@ def get_mcp_server_url(server_name: str) -> str:
     Returns:
         서버 URL
     """
-    url = MCP_SERVER_MAPPING.get(server_name)
+    # MCPServerConfig의 표준 설정에서 URL을 조회합니다.
+    server_cfg = MCPServerConfig.STANDARD_MCP_SERVERS.get(server_name)
+    url = server_cfg.get("url") if server_cfg else None
     if not url:
         raise ValueError(f"Unknown MCP server: {server_name}")
     return url
@@ -117,28 +88,25 @@ async def load_tools_from_single_server(
         server_url = get_mcp_server_url(server_name)
         logger.info(f"Attempting to connect to MCP server: {server_name} at {server_url}")
 
-        # 헤더 구성
-        headers = {}
+        # MCPServerConfig를 사용해 표준 서버 설정을 취득
+        server_configs = MCPServerConfig.get_server_configs([server_name])
+
+        # 인증 토큰이 있으면 해당 서버 설정에 헤더 추가
         if auth_token:
+            server_entry = server_configs.get(server_name, {})
+            headers = server_entry.get("headers", {})
             headers["Authorization"] = f"Bearer {auth_token}"
+            server_entry["headers"] = headers
+            server_configs[server_name] = server_entry
 
-        # 단일 서버 연결 구성
-        single_server_client = MultiServerMCPClient({
-            server_name: {
-                "transport": "streamable_http",
-                "url": server_url,
-                "headers": headers,
-            }
-        })
-
-        # 개별 서버 세션으로 도구 로드
-        async with single_server_client.session(server_name) as session:
-            tools = await load_mcp_tools(session)
+        # 표준 헬퍼로 클라이언트 생성 및 도구 로딩
+        _, tools = await create_mcp_client_and_tools(server_configs)
 
         if tools:
-            # 필터링 적용
             filtered_tools = _filter_tools(tools, allow, require)
-            logger.info(f"Successfully loaded {len(tools)} tools, filtered to {len(filtered_tools)} tools from {server_name}")
+            logger.info(
+                f"Successfully loaded {len(tools)} tools, filtered to {len(filtered_tools)} tools from {server_name}"
+            )
             return filtered_tools
         else:
             logger.warning(f"No tools found from server {server_name}")
@@ -309,23 +277,15 @@ async def test_mcp_connection(server_name: str) -> bool:
         server_url = get_mcp_server_url(server_name)
         logger.info(f"Testing connection to MCP server: {server_name} at {server_url}")
 
-        mcp_client = MultiServerMCPClient(
-            {
-                server_name: {
-                    "transport": "streamable_http",
-                    "url": server_url,
-                }
-            }
-        )
+        server_configs = MCPServerConfig.get_server_configs([server_name])
+        _, tools = await create_mcp_client_and_tools(server_configs)
 
-        async with mcp_client.session(server_name) as session:
-            tools = await load_mcp_tools(session)
-            success = len(tools) > 0
-            if success:
-                logger.info(f"Connection test successful for {server_name} - found {len(tools)} tools")
-            else:
-                logger.warning(f"Connection test for {server_name} - no tools found")
-            return success
+        success = len(tools) > 0
+        if success:
+            logger.info(f"Connection test successful for {server_name} - found {len(tools)} tools")
+        else:
+            logger.warning(f"Connection test for {server_name} - no tools found")
+        return success
     except Exception as e:
         logger.warning(f"Connection test failed for {server_name}: {e}")
         return False

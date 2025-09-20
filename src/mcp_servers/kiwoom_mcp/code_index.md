@@ -19,10 +19,21 @@ kiwoom_mcp/
 ├── __init__.py
 ├── common/
 │   ├── __init__.py
+│   ├── api_registry/
+│   │   └── kiwoom_api_registry.yaml
+│   ├── auth/
+│   │   └── kiwoom_auth.py
 │   ├── client/
+│   │   ├── __init__.py
+│   │   └── kiwoom_restapi_client.py
+│   ├── clients/
+│   │   └── kiwoom_base.py
 │   ├── constants/
-│   ├── domain_base.py
-│   └── korean_market.py
+│   │   ├── __init__.py
+│   │   ├── api_loader.py
+│   │   ├── api_types.py
+│   │   └── endpoints.py
+│   └── domain_base.py
 └── domains/
     ├── __init__.py
     ├── info_domain.py

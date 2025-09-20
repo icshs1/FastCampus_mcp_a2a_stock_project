@@ -1,14 +1,14 @@
 """
-DataCollector Agent with A2A Integration.
+A2A 통합이 적용된 데이터 수집(DataCollector) 에이전트 V2.
 
-This module provides a DataCollector agent that implements the standardized
-A2A interface for seamless integration with the A2A protocol.
+이 모듈은 표준 A2A 인터페이스를 구현하여 A2A 프로토콜과 매끄럽게 연동되는
+데이터 수집 에이전트를 제공합니다.
 
-Beginner notes:
-    - The agent emits streaming updates only when the internal buffer decides
-      the chunk is readable. Tiny token chunks are buffered to reduce noise.
-    - The final output includes counts (tool calls, collected symbols) so a
-      supervisor can quickly summarize progress without parsing free text.
+메모:
+    - 내부 버퍼가 "읽을 만하다"고 판단할 때만 스트리밍 업데이트를 내보냅니다.
+      너무 작은 토큰 조각은 소음을 줄이기 위해 버퍼링됩니다.
+    - 최종 출력에는 도구 호출 횟수와 수집된 종목 수 등의 카운트 정보가 포함되어,
+      감독 에이전트가 자유 텍스트를 파싱하지 않고도 진행 상황을 요약할 수 있습니다.
 """
 
 from datetime import datetime
@@ -36,10 +36,10 @@ load_env_file()
 
 class DataCollectorA2AAgent(BaseA2AAgent, BaseGraphAgent):
     """
-    DataCollector Agent with A2A integration support.
+    A2A 통합을 지원하는 데이터 수집 에이전트.
 
-    This agent handles data collection from various sources (market data, news, etc.)
-    and provides standardized A2A output for streaming and polling operations.
+    이 에이전트는 다양한 소스(시세, 뉴스 등)에서 데이터를 수집하고,
+    스트리밍/폴링 작업 모두에 대해 표준화된 A2A 출력을 제공합니다.
     """
 
     def __init__(
@@ -49,12 +49,12 @@ class DataCollectorA2AAgent(BaseA2AAgent, BaseGraphAgent):
         checkpointer=None
     ):
         """
-        Initialize DataCollector A2A Agent.
+        데이터 수집 A2A 에이전트 초기화.
 
         Args:
-            model: LLM model (default: gpt-4.1)
-            is_debug: Debug mode flag
-            checkpointer: Checkpoint manager (default: MemorySaver)
+            model: 사용할 LLM 모델 (기본: gpt-4.1)
+            is_debug: 디버그 모드 여부
+            checkpointer: 체크포인트 매니저 (기본: MemorySaver)
         """
         BaseA2AAgent.__init__(self)
 
@@ -85,15 +85,15 @@ class DataCollectorA2AAgent(BaseA2AAgent, BaseGraphAgent):
         self.tool_calls_count = 0
 
     async def initialize(self):
-        """Initialize the agent with MCP tools and create the graph.
+        """MCP 도구 로딩 및 그래프 생성 초기화.
 
-        Steps:
-            1) Load domain-specific MCP tools for data collection
-            2) Create a tailored system prompt
-            3) Build a ReAct graph with checkpointing
+        단계:
+            1) 데이터 수집에 특화된 MCP 도구 로딩
+            2) 목적에 맞춘 시스템 프롬프트 생성
+            3) 체크포인트가 포함된 ReAct 그래프 구성
 
         Raises:
-            RuntimeError: Wrapping lower-level errors during tool/prompt/graph setup
+            RuntimeError: 도구/프롬프트/그래프 설정 중 발생한 하위 오류를 래핑하여 전달
         """
         try:
             # Load MCP tools
@@ -127,16 +127,15 @@ class DataCollectorA2AAgent(BaseA2AAgent, BaseGraphAgent):
         config: Optional[Dict[str, Any]] = None
     ) -> A2AOutput:
         """
-        Execute the agent with A2A-compatible input and output.
+        A2A 호환 입력/출력으로 에이전트를 실행합니다.
 
         Args:
-            input_dict: ``{"messages": [...]}`` payload or a structured
-                collection request. For messages, use LangChain message objects.
-            config: Optional execution config; a default ``thread_id`` is set
-                when not provided.
+            input_dict: ``{"messages": [...]}`` 형태의 페이로드 또는 구조화된 수집 요청.
+                메시지는 LangChain 메시지 객체를 사용합니다.
+            config: 선택적 실행 설정. 제공되지 않으면 기본 ``thread_id`` 가 설정됩니다.
 
         Returns:
-            A2AOutput: Standardized output for A2A processing
+            A2AOutput: A2A 처리를 위한 표준화된 출력
         """
         if not self.graph:
             await self.initialize()
@@ -164,9 +163,9 @@ class DataCollectorA2AAgent(BaseA2AAgent, BaseGraphAgent):
         self,
         event: Dict[str, Any]
     ) -> Optional[A2AOutput]:
-        """Convert a LangGraph streaming event into an ``A2AOutput`` update.
+        """LangGraph 스트리밍 이벤트를 ``A2AOutput`` 업데이트로 변환합니다.
 
-        Returns ``None`` for small token chunks that remain buffered.
+        너무 작은 토큰 조각으로 버퍼에 남아 있는 경우에는 ``None`` 을 반환합니다.
         """
         event_type = event.get("event", "")
 
@@ -208,7 +207,7 @@ class DataCollectorA2AAgent(BaseA2AAgent, BaseGraphAgent):
         elif event_type == "on_tool_end":
             tool_output = event.get("data", {}).get("output", {})
 
-            # Only send structured data for significant tool outputs
+            # 의미 있는 도구 출력에 대해서만 구조화된 데이터를 전송
             if tool_output and isinstance(tool_output, dict):
                 return self.create_a2a_output(
                     status="working",
@@ -238,9 +237,9 @@ class DataCollectorA2AAgent(BaseA2AAgent, BaseGraphAgent):
         self,
         state: Dict[str, Any]
     ) -> A2AOutput:
-        """Create the final ``A2AOutput`` from the LangGraph run state.
+        """LangGraph 실행 상태로부터 최종 ``A2AOutput`` 을 생성합니다.
 
-        Includes structured counters and timestamps for easy downstream use.
+        후속 처리를 쉽게 하기 위해 카운터 및 타임스탬프를 포함합니다.
         """
         try:
             # Extract messages from state
@@ -296,16 +295,16 @@ class DataCollectorA2AAgent(BaseA2AAgent, BaseGraphAgent):
         user_question: str | None = None,
         context_id: str | None = None
     ) -> A2AOutput:
-        """Helper method for high-level data collection requests.
+        """상위 수준의 데이터 수집 요청을 위한 헬퍼 메서드.
 
         Args:
-            symbols: Target symbols (e.g., ["005930", "000660"]).
-            data_types: Data categories (e.g., ["price", "news"]).
-            user_question: If provided, overrides auto-built request text.
-            context_id: Threading context for reproducibility.
+            symbols: 대상 종목 코드 (예: ["005930", "000660"])
+            data_types: 데이터 범주 (예: ["price", "news"])
+            user_question: 제공 시 자동 생성 요청 텍스트를 대체
+            context_id: 재현 가능성을 위한 스레딩 컨텍스트 ID
 
         Returns:
-            A2AOutput: Standardized collection result.
+            A2AOutput: 표준화된 수집 결과
         """
         # Build the collection request
         request = self._build_collection_request(symbols, data_types, user_question)
@@ -324,7 +323,7 @@ class DataCollectorA2AAgent(BaseA2AAgent, BaseGraphAgent):
         data_types: list[str] = None,
         user_question: str = None
     ) -> str:
-        """Build a concise, Korean instruction for the agent to collect data."""
+        """에이전트가 데이터를 수집하도록 간결한 한국어 지시문을 생성합니다."""
         if user_question:
             return user_question
 
@@ -349,15 +348,15 @@ async def create_data_collector_a2a_agent(
     checkpointer=None
 ) -> DataCollectorA2AAgent:
     """
-    Create and initialize a DataCollector A2A Agent.
+    데이터 수집 A2A 에이전트를 생성하고 초기화합니다.
 
     Args:
-        model: LLM model (default: gpt-4o-mini)
-        is_debug: Debug mode flag
-        checkpointer: Checkpoint manager
+        model: LLM 모델 (기본: gpt-4.1-mini)
+        is_debug: 디버그 모드 플래그
+        checkpointer: 체크포인트 매니저
 
     Returns:
-        DataCollectorA2AAgent: Initialized agent instance
+        DataCollectorA2AAgent: 초기화된 에이전트 인스턴스
     """
     agent = DataCollectorA2AAgent(model, is_debug, checkpointer)
     await agent.initialize()

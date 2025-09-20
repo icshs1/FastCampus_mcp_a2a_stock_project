@@ -1,13 +1,12 @@
 """
-Simplified LangGraph A2A Agent Executor V2.
+LangGraph A2A 에이전트 실행기(Executor) V2.
 
-This module provides a clean integration between LangGraph agents with A2A interface
-and the A2A protocol, leveraging standardized output formats for both streaming and polling.
+이 모듈은 A2A 인터페이스를 갖춘 LangGraph 에이전트와 A2A 프로토콜 사이를 연동합니다.
+스트리밍과 폴링 모두에서 표준화된 출력 형식을 활용합니다.
 """
 
 from datetime import datetime
 from typing import Any, AsyncGenerator, Dict, Optional, Type, cast
-from uuid import uuid4
 
 import pytz
 import structlog
@@ -16,7 +15,6 @@ from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
 from a2a.server.tasks import InMemoryTaskStore, TaskManager, TaskUpdater
 from a2a.types import (
-    Artifact,
     DataPart,
     Message,
     Part,
@@ -38,11 +36,10 @@ logger = structlog.get_logger(__name__)
 
 class LangGraphAgentExecutorV2(AgentExecutor):
     """
-    A2A Agent Executor for LangGraph agents with A2A interface.
+    A2A 인터페이스를 지원하는 LangGraph 에이전트를 위한 실행기.
 
-    This executor leverages the standardized A2A interface implemented by each
-    LangGraph agent, eliminating the need for custom result extractors and
-    complex streaming logic.
+    각 에이전트가 구현한 표준 A2A 인터페이스를 활용하여,
+    별도의 커스텀 결과 추출기나 복잡한 스트리밍 로직 없이 동작합니다.
     """
 
     def __init__(
@@ -52,12 +49,12 @@ class LangGraphAgentExecutorV2(AgentExecutor):
         **agent_kwargs
     ):
         """
-        Initialize the LangGraph A2A Executor V2.
+        LangGraph A2A Executor V2 초기화.
 
         Args:
-            agent_class: The A2A-enabled agent class to instantiate
-            config: Configuration for the executor
-            **agent_kwargs: Additional arguments to pass to the agent constructor
+            agent_class: 인스턴스화할 A2A 지원 에이전트 클래스
+            config: 실행기 설정
+            **agent_kwargs: 에이전트 생성자에 전달할 추가 인자
         """
         self.agent_class = agent_class
         self.agent_kwargs = agent_kwargs
@@ -71,11 +68,11 @@ class LangGraphAgentExecutorV2(AgentExecutor):
         logger.info(f" LangGraphAgentExecutorV2 initialized for {agent_class.__name__}")
 
     async def _ensure_agent_initialized(self):
-        """Ensure the agent instance is created and initialized.
+        """에이전트 인스턴스가 생성·초기화되었는지 보장합니다.
 
-        - Instantiates ``agent_class`` with provided kwargs
-        - Awaits optional ``initialize()`` hook on the agent
-        - Raises ``RuntimeError`` if initialization fails
+        - 제공된 kwargs 로 ``agent_class`` 인스턴스화
+        - 에이전트에 ``initialize()`` 훅이 있으면 await 실행
+        - 실패 시 ``RuntimeError`` 발생
         """
         if not self.agent:
             try:
@@ -96,26 +93,26 @@ class LangGraphAgentExecutorV2(AgentExecutor):
         context: RequestContext,
         event_queue: EventQueue
     ) -> None:
-        """Execute the A2A request using the standardized agent interface.
+        """표준화된 에이전트 인터페이스로 A2A 요청을 실행합니다.
 
-        Orchestrates task lifecycle for blocking or streaming execution modes,
-        producing Parts-based messages compliant with the A2A SDK.
+        블로킹/스트리밍 실행 모드에 따라 태스크 라이프사이클을 오케스트레이션하고,
+        A2A SDK 규격의 Parts 기반 메시지를 생성합니다.
 
         Args:
-            context: A2A request context
-            event_queue: Event queue for sending messages
+            context: A2A 요청 컨텍스트
+            event_queue: 메시지 전송을 위한 이벤트 큐
         """
         try:
             logger.info(f"Starting A2A agent execution for {self.agent_class.__name__}")
 
-            # Ensure agent is initialized
+            # 에이전트 초기화 보장
             await self._ensure_agent_initialized()
 
-            # Process input
+            # 입력 처리
             input_dict = await self._process_input(context)
             logger.info(f"Processed input: {type(input_dict)}")
 
-            # Setup task updater
+            # 태스크 업데이트 도구 준비
             task_id = cast(str, context.task_id)
             context_id = getattr(context, "context_id", task_id)
             user_message = create_text_message_object(content=input_dict.get("messages", [{}])[0].get("content", ""))
@@ -158,27 +155,18 @@ class LangGraphAgentExecutorV2(AgentExecutor):
 
             await self.updater.update_status(TaskState.working)
             if is_blocking or not self.config.enable_streaming:
-                output = await self._execute_blocking(input_dict, context_id)
-                logger.info(f"Blocking execution output: {output}")
-            else:
-                output = await self._execute_streaming(input_dict, context_id)
-                logger.info(f"Streaming execution output: {output}")
-
-            artifact = Artifact(
-                artifact_id=str(uuid4()),
-                parts=output.parts,
-            )
-            task = Task(
-                id=task_id,
-                context_id=context_id,
-                artifacts=[artifact],
-                status=TaskStatus(
-                    state=TaskState.completed,
-                    timestamp=datetime.now(tz=pytz.timezone("Asia/Seoul")).isoformat()
+                final_message = await self._execute_blocking(input_dict, context_id)
+                logger.info(f"Blocking execution output: {final_message}")
+                # 단 한 번만 최종 상태로 업데이트 (스토어 + 이벤트 반영)
+                await self.updater.update_status(
+                    TaskState.completed,
+                    final_message,
+                    final=True,
                 )
-            )
-            await self.event_queue.enqueue_event(task)
-            await self.updater.complete()
+            else:
+                # 스트리밍 모드: 내부에서 최종 완료 시점에 스토어를 업데이트합니다
+                async for _ in self._execute_streaming(input_dict, context_id):
+                    pass
 
         except Exception as e:
             logger.error(f"Critical error in executor: {e}")
@@ -202,15 +190,15 @@ class LangGraphAgentExecutorV2(AgentExecutor):
         input_dict: Dict[str, Any],
         context_id: str,
     ) -> Message:
-        """Execute in blocking mode (no streaming).
+        """블로킹 모드로 실행합니다(스트리밍 없음).
 
-        Calls the agent's ``execute_for_a2a`` and emits a single final
-        message with aggregated Parts.
+        에이전트의 ``execute_for_a2a`` 를 호출하고, 합쳐진 Parts 를 담은 최종
+        메시지 하나를 전송합니다.
         """
         logger.info("Using blocking execution mode")
 
         try:
-            # Execute the agent using standardized interface
+            # 표준화된 인터페이스로 에이전트 실행
             config = {"configurable": {"thread_id": context_id}}
             result = await self.agent.execute_for_a2a(input_dict, config)
 
@@ -222,7 +210,7 @@ class LangGraphAgentExecutorV2(AgentExecutor):
             logger.info(f"Result: {result}")
             logger.info("===========" * 10)
 
-            # Send the result based on A2AOutput format
+            # A2AOutput 형식에 맞춰 결과 전송
             # NOTE: 이 안에서 상태 변경 금지.
             last_message = await self._send_a2a_output(result)
             logger.info(f"Last message: {last_message}")
@@ -238,66 +226,92 @@ class LangGraphAgentExecutorV2(AgentExecutor):
         input_dict: Dict[str, Any],
         context_id: str,
     ) -> AsyncGenerator[Message, None]:
-        """Execute with streaming support.
+        """스트리밍 지원 모드로 실행합니다.
 
-        Streams LangGraph events via the agent's ``format_stream_event``
-        until completion, then extracts final output from graph state.
+        완료 시점까지 에이전트의 ``format_stream_event`` 를 통해 LangGraph 이벤트를
+        스트리밍하고, 이후 그래프 상태에서 최종 출력을 추출합니다.
         """
         logger.info("Using streaming execution mode")
 
         try:
-            # For streaming, we need to hook into the agent's graph events
-            # This requires the agent to have a graph attribute
+            # 스트리밍을 위해 에이전트의 그래프 이벤트에 훅을 연결해야 합니다
+            # 이를 위해 에이전트에 graph 속성이 필요합니다
             if not hasattr(self.agent, 'graph'):
                 logger.warning("Agent doesn't support streaming, falling back to blocking")
-                await self._execute_blocking(input_dict, context_id)
+                final_message = await self._execute_blocking(input_dict, context_id)
+                # 블로킹 결과로 즉시 완료 상태 전송
+                if self.updater:
+                    await self.updater.update_status(
+                        TaskState.completed,
+                        final_message,
+                        final=True,
+                    )
                 return
 
-            # Track completion
+            # 완료 여부/이벤트 개수 추적
             is_completed = False
             event_count = 0
 
-            # Stream events from the graph
+            # 그래프에서 이벤트 스트리밍
             async for event in self.agent.graph.astream_events(
                 input_dict,
                 config={"configurable": {"thread_id": context_id}}
             ):
                 event_count += 1
 
-                # Let the agent format the streaming event
+                # 에이전트로 하여금 스트리밍 이벤트를 포맷하도록 위임
                 formatted_output = self.agent.format_stream_event(event)
 
                 if formatted_output:
+                    # 메시지 생성
                     _message = await self._send_a2a_output(formatted_output)
+                    # 상태 매핑 및 전송
+                    status_str = formatted_output.get("status", "working")
+                    mapped_state = self._map_status_to_task_state(status_str)
+                    is_final = bool(formatted_output.get("final", False))
+
+                    if self.updater:
+                        await self.updater.update_status(
+                            mapped_state,
+                            _message,
+                            final=is_final,
+                        )
+
                     yield _message
 
-                    # Check if this is a completion event
-                    if formatted_output.get("final", False):
+                    # 이 이벤트가 완료 신호인지 확인
+                    if is_final:
                         is_completed = True
                         logger.info(" Completion detected from agent")
                         break
 
-                # Check for completion patterns in raw event
+                # 원시 이벤트에서 완료 패턴 확인
                 if not is_completed and self._is_completion_event(event):
                     is_completed = True
                     logger.info(" Completion detected from event pattern")
                     break
 
-            # If not completed yet, get final state
+            # 아직 완료되지 않았다면 최종 상태를 가져오기
             if not is_completed:
                 logger.info("Streaming ended, extracting final state")
 
-                # Get the final state from the graph
+                # 그래프에서 최종 상태 조회
                 state_snapshot = await self.agent.graph.aget_state(
                     config={"configurable": {"thread_id": context_id}}
                 )
 
                 if state_snapshot and state_snapshot.values:
-                    # Extract final output using agent's method
+                    # 에이전트 메서드를 사용해 최종 출력 추출
                     final_output = self.agent.extract_final_output(state_snapshot.values)
 
-                    # Send final output
+                    # 최종 출력 전송 및 완료 처리
                     _message = await self._send_a2a_output(final_output)
+                    if self.updater:
+                        await self.updater.update_status(
+                            TaskState.completed,
+                            _message,
+                            final=True,
+                        )
                     yield _message
 
             logger.info(f" Streaming complete - Events: {event_count}")
@@ -311,10 +325,10 @@ class LangGraphAgentExecutorV2(AgentExecutor):
         output: A2AOutput,
     ) -> Message:
         """
-        Send A2AOutput as appropriate A2A message parts.
+        A2AOutput 을 A2A 메시지 Parts 로 변환하여 전송합니다.
 
         Args:
-            output: Standardized A2A output from agent
+            output: 에이전트에서 생성된 표준 A2A 출력
         """
         try:
             # A2AOutput 내용 전체 로깅
@@ -325,29 +339,39 @@ class LangGraphAgentExecutorV2(AgentExecutor):
             data_content = output.get("data_content")
             agent_type = output.get("agent_type", "Unknown")
 
+            logger.info(f"A2AOutput details: status={status}, text_content={len(text_content) if text_content else 0} chars, data_content_keys={list(data_content.keys()) if data_content else 'None'}, agent_type={agent_type}")
+
+            # Task 상태 매핑 로그
+            mapped_state = self._map_status_to_task_state(status)
+            logger.info(f"Task status mapping: {status} -> {mapped_state}")
+
             parts = []
 
             if text_content:
                 parts.append(Part(root=TextPart(text=text_content)))
+                logger.info(f"Added TextPart: {len(text_content)} chars")
 
             if data_content:
                 parts.append(Part(root=DataPart(data=data_content)))
+                logger.info(f"Added DataPart: {len(data_content)} keys")
 
-            # Ensure we always send something - create fallback content if parts is empty
+            # 비어있는 Parts 를 방지하기 위한 폴백 처리
             if not parts:
-                # Create fallback text with agent and status information
+                # 에이전트/상태 정보를 포함한 폴백 텍스트 생성
                 agent_type = output.get("agent_type", "Agent")
                 fallback_text = f"{agent_type} - {status}"
 
-                # Include error message if available
+                # 에러 메시지가 있으면 포함
                 error_msg = output.get("error_message")
                 if error_msg:
                     fallback_text += f": {error_msg}"
 
                 parts.append(Part(root=TextPart(text=fallback_text)))
                 logger.warning(f"No content provided, sending fallback text: {fallback_text}")
+                logger.warning(f"A2AOutput had no valid content - text_content: {text_content is not None}, data_content: {data_content is not None}")
 
             result = new_agent_parts_message(parts)
+            logger.info(f"Created agent message with {len(parts)} parts")
             return result
 
         except Exception as e:
@@ -358,11 +382,11 @@ class LangGraphAgentExecutorV2(AgentExecutor):
         context: RequestContext,
         event_queue: EventQueue
     ) -> None:
-        """Cancel an ongoing task.
+        """진행 중인 태스크를 취소합니다.
 
         Args:
-            context: Request context
-            event_queue: Event queue
+            context: 요청 컨텍스트
+            event_queue: 이벤트 큐
         """
         logger.info(f"Cancelling task: {context.task_id}")
 
@@ -378,14 +402,15 @@ class LangGraphAgentExecutorV2(AgentExecutor):
     # Helper methods
 
     async def _process_input(self, context: RequestContext) -> Dict[str, Any]:
-        """Process user input and/or DataPart payload from request context.
+        """요청 컨텍스트에서 사용자 입력 및/또는 DataPart 페이로드를 처리합니다.
 
-        Returns a standard dict with either structured payload (from DataPart)
-        or a minimal ``{"messages": [{"role": "user", "content": ...}]}``.
+        DataPart 로부터 온 구조화된 페이로드면 그대로 반환하고,
+        그렇지 않으면 최소 형태의 ``{"messages": [{"role": "user", "content": ...}]}``
+        딕셔너리를 반환합니다.
         """
         query = context.get_user_input()
 
-        # Try to get structured data from DataPart
+        # DataPart 에서 구조화된 데이터 추출 시도
         payload = {}
         if context.message and getattr(context.message, "parts", None):
             try:
@@ -398,7 +423,7 @@ class LangGraphAgentExecutorV2(AgentExecutor):
             except Exception as e:
                 logger.debug(f"No DataPart found: {e}")
 
-        # Return appropriate format
+        # 적절한 형식으로 반환
         if payload:
             return payload
         elif query:
@@ -407,14 +432,14 @@ class LangGraphAgentExecutorV2(AgentExecutor):
             return {"messages": []}
 
     def _is_blocking_mode(self, context: RequestContext) -> bool:
-        """Check if blocking mode is requested via request configuration."""
+        """요청 설정을 통해 블로킹 모드가 요청되었는지 확인합니다."""
         if hasattr(context, "request") and context.request:
             if hasattr(context.request, "configuration") and context.request.configuration:
                 return getattr(context.request.configuration, "blocking", False)
         return False
 
     def _is_completion_event(self, event: Dict[str, Any]) -> bool:
-        """Check if a LangGraph event implies completion of the workflow."""
+        """LangGraph 이벤트가 워크플로우 완료를 의미하는지 확인합니다."""
         event_type = event.get("event", "")
 
         if event_type == "on_chain_end":
@@ -425,7 +450,7 @@ class LangGraphAgentExecutorV2(AgentExecutor):
         return False
 
     def _map_status_to_task_state(self, status: str) -> TaskState:
-        """Map A2AOutput status string to A2A TaskState enum."""
+        """A2AOutput의 상태 문자열을 A2A TaskState 열거형으로 매핑합니다."""
         mapping = {
             "working": TaskState.working,
             "completed": TaskState.completed,
@@ -443,8 +468,10 @@ def create_data_collector_executor(
     config: Optional[LangGraphExecutorConfig] = None,
     **agent_kwargs
 ) -> LangGraphAgentExecutorV2:
-    """Create executor for DataCollector agent."""
-    from src.lg_agents.data_collector_agent_a2a import DataCollectorA2AAgent
+    """DataCollector 에이전트용 실행기를 생성합니다."""
+    from src.a2a_agents.data_collector.data_collector_agent_a2a_v2 import (
+        DataCollectorA2AAgent,
+    )
     return LangGraphAgentExecutorV2(DataCollectorA2AAgent, config, **agent_kwargs)
 
 
@@ -452,8 +479,8 @@ def create_analysis_executor(
     config: Optional[LangGraphExecutorConfig] = None,
     **agent_kwargs
 ) -> LangGraphAgentExecutorV2:
-    """Create executor for Analysis agent."""
-    from src.lg_agents.analysis_agent_a2a import AnalysisA2AAgent
+    """Analysis 에이전트용 실행기를 생성합니다."""
+    from src.a2a_agents.analysis.analysis_agent_a2a_v2 import AnalysisA2AAgent
     return LangGraphAgentExecutorV2(AnalysisA2AAgent, config, **agent_kwargs)
 
 
@@ -461,6 +488,6 @@ def create_trading_executor(
     config: Optional[LangGraphExecutorConfig] = None,
     **agent_kwargs
 ) -> LangGraphAgentExecutorV2:
-    """Create executor for Trading agent."""
-    from src.lg_agents.trading_agent_a2a import TradingA2AAgent
+    """Trading 에이전트용 실행기를 생성합니다."""
+    from src.a2a_agents.trading.trading_agent_a2a_v2 import TradingA2AAgent
     return LangGraphAgentExecutorV2(TradingA2AAgent, config, **agent_kwargs)

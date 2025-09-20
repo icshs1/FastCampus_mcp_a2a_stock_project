@@ -17,11 +17,13 @@ A2A 프로토콜과 LangGraph를 연결하는 통합 레이어 모듈입니다. 
 ```text
 a2a_integration/
 ├── __init__.py                      # 패키지 초기화 및 exports
-├── executor.py                      # LangGraphAgentExecutor 핵심 실행기
-├── generic_executor.py              # GenericAgentExecutor 범용 실행기
+├── executor.py                      # LangGraphAgentExecutor
+├── executor_v2.py                   # LangGraphAgentExecutor V2
 ├── models.py                        # 설정 모델 정의
 ├── a2a_lg_client_utils.py          # A2A 클라이언트 유틸리티
+├── a2a_lg_client_utils_v2.py       # V2 클라이언트 유틸: 세션/백오프 고도화
 ├── a2a_lg_utils.py                  # A2A 서버 빌드 유틸리티
+├── cors_utils.py                    # CORS/보안 헤더 유틸리티
 ├── auth/
 │   ├── __init__.py                 # 인증 모듈 초기화
 │   └── credentials.py              # 자격 증명 서비스
@@ -108,6 +110,26 @@ class GenericAgentExecutor:
         """
 ```
 
+### ⚡ **executor_v2.py** - 차세대 실행기 (V2)
+
+#### 핵심 개선점
+```python
+class LangGraphAgentExecutorV2:
+    """스트리밍/체크포인트/인터럽트 제어를 강화한 V2 실행기"""
+
+    async def run(...):
+        """A2A 요청 실행 (향상된 오류 복구, 타임아웃 제어)"""
+
+    async def stream(...):
+        """세분화된 이벤트 스트리밍, 중간 상태 포함"""
+```
+
+#### 특징
+- 세분화된 스트리밍 이벤트 타입
+- 체크포인트 네임스페이스 분리 및 재시작 지원
+- 인터럽트 지점 제어(`interrupt_before`)
+- 예외 그룹 처리 및 재시도 정책 고도화
+
 ### 📋 **models.py** - 설정 모델
 
 #### 구성 클래스
@@ -178,7 +200,31 @@ async def query_data_a2a_agent(
     """
 ```
 
+### 🚀 **a2a_lg_client_utils_v2.py** - 클라이언트 유틸 (V2)
+
+#### 개선 사항
+```python
+class A2AClientManagerV2(A2AClientManager):
+    """지수 백오프, 세션 재사용, 회로차단기 패턴 적용"""
+
+    async def request(...):
+        """자동 재시도/헤더 주입/메트릭 기록"""
+```
+
+#### 추가 유틸
+- `stream_agent_events(...)`: 서버 스트림 이벤트 구독 헬퍼
+- `with_circuit_breaker(...)`: 일시적 장애 보호 래퍼
+
 ### 🏗️ **a2a_lg_utils.py** - 서버 유틸리티
+### 🛡️ **cors_utils.py** - CORS/보안 헤더
+
+```python
+def add_cors(app: ASGIApplication, allow_origins: list[str]) -> None:
+    """Starlette/FastAPI 앱에 CORS 미들웨어 추가"""
+
+def add_security_headers(app: ASGIApplication) -> None:
+    """보안 헤더 설정 (CSP, HSTS, X-Frame-Options 등)"""
+```
 
 #### 서버 생성 함수
 ```python

@@ -20,19 +20,6 @@ load_env_file()
 
 logger = structlog.get_logger(__name__)
 
-# TODO: 디테일하게는 구현 필요
-def _human_in_the_loop(human_approval: bool, feedback: str) -> dict:
-    if human_approval:
-        return {
-            "human_approval": True,
-            "feedback": feedback,
-        }
-    else:
-        return {
-            "human_approval": False,
-            "feedback": feedback,
-        }
-
 async def create_trading_agent(model=None, is_debug: bool = False):
     """Trading Agent 생성
 

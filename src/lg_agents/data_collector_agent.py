@@ -30,17 +30,17 @@ async def create_data_collector_agent(
     """
     create_react_agent를 통한 데이터 수집 에이전트
 
-    MCP 도구들을 로딩하고 프롬프트를 설정한 후 create_react_agent를 생성합니다.
+    MCP 도구를 로딩하고 프롬프트를 설정한 뒤, create_react_agent를 생성합니다.
 
     Args:
-        model: LLM 모델 (기본값: gpt-4.1-mini)
+        model: 사용할 LLM 모델 (기본값: gpt-4.1-mini)
         is_debug: 디버그 모드 여부
         checkpointer: 체크포인터 (기본값: MemorySaver)
 
     Returns:
         create_react_agent로 생성된 LangGraph Agent
 
-    Usage:
+    사용 예:
         agent = await create_data_collector_agent()
         result = await agent.ainvoke({"messages": [...]})
     """

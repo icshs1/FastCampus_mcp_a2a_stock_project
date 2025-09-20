@@ -25,18 +25,6 @@ class LangGraphExecutorConfig(BaseModel):
         description="Enable Human-in-the-Loop interrupt handling"
     )
 
-    task_timeout_seconds: int = Field(
-        default=300,
-        description="Task timeout in seconds",
-        gt=0
-    )
-
-    # Text extraction
-    custom_text_keys: Optional[list[str]] = Field(
-        default=None,
-        description="Custom keys for text extraction from results"
-    )
-
     # Strategy configuration for custom processors
     strategy_config: Optional[dict] = Field(
         default=None,

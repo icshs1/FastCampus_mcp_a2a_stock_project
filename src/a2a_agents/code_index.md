@@ -42,12 +42,14 @@ a2a_agents/
 │   ├── __init__.py
 │   ├── __main__.py                        # 독립 실행 엔트리포인트
 │   ├── analysis_agent_a2a.py              # A2A AnalysisAgent 구현
+│   ├── analysis_agent_a2a_v2.py           # A2A AnalysisAgent V2 구현
 │   └── code_index.md
 │
 └── trading/                               # TradingAgent A2A 래퍼
     ├── __init__.py
     ├── __main__.py                        # 독립 실행 엔트리포인트
     ├── trading_agent_a2a.py               # A2A TradingAgent 구현
+    ├── trading_agent_a2a_v2.py            # A2A TradingAgent V2 구현
     └── code_index.md
 ```
 

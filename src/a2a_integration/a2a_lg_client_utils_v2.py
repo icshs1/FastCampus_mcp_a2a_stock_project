@@ -507,6 +507,25 @@ class A2AMessageEngine:
         task = event[0]
         logger.info(f"Task type: {type(task)}, has artifacts: {hasattr(task, 'artifacts')}, has history: {hasattr(task, 'history')}")
 
+        # Status.message에서 Part 추출 (권위 있는 최신 상태 메시지)
+        try:
+            task_status = getattr(task, 'status', None)
+            status_message = getattr(task_status, 'message', None) if task_status else None
+            if status_message and hasattr(status_message, 'parts') and status_message.parts:
+                logger.info(f"Status message has {len(status_message.parts)} parts")
+                for j, part in enumerate(status_message.parts):
+                    root = getattr(part, 'root', None)
+                    logger.info(f"Status Part {j}: root type: {type(root)}, has text: {hasattr(root, 'text') if root else False}, has data: {hasattr(root, 'data') if root else False}")
+                    if root:
+                        if hasattr(root, 'text') and root.text:
+                            result["text"] = root.text
+                            logger.info(f"Extracted TextPart from status.message, length: {len(root.text)}")
+                        elif hasattr(root, 'data') and root.data:
+                            result["data"] = root.data
+                            logger.info("Extracted DataPart from status.message")
+        except Exception as e:
+            logger.debug(f"Failed to extract parts from status.message: {e}")
+
         # Artifacts에서 Part 추출
         # - 아티팩트의 파트는 서버가 보낸 최종 결과에 가까운 경향이 있습니다.
         if hasattr(task, "artifacts") and task.artifacts:
@@ -865,8 +884,22 @@ class A2AMessageEngine:
                         # logger.warning(f"Task {task_id} failed or cancelled")
                         return task  # 실패한 task도 반환하여 에러 정보 추출 가능
                     elif 'working' in state_str or 'running' in state_str:
-                        # logger.debug(f"Task {task_id} still in progress...")
-                        pass
+                        # 작업 중이지만, 아티팩트나 에이전트 메시지가 있으면 완료로 간주하고 반환
+                        has_artifacts = hasattr(task, 'artifacts') and task.artifacts
+                        has_agent_history = False
+                        if hasattr(task, 'history') and task.history:
+                            for msg in task.history:
+                                if hasattr(msg, 'role') and str(msg.role).lower() == 'agent':
+                                    has_agent_history = True
+                                    break
+
+                        if has_artifacts or has_agent_history:
+                            logger.info(f"Task {task_id} is working but has artifacts/history - treating as completed")
+                            return task
+
+                        logger.info(f"Task {task_id} is still working - reducing polling frequency")
+                        await asyncio.sleep(poll_interval * 2)
+                        continue
                     else:
                         # 알 수 없는 상태면 내용이 있는지 확인
                         if hasattr(task, 'artifacts') and task.artifacts:
@@ -923,6 +956,22 @@ class A2AMessageEngine:
                                     # Authoritative data from artifacts
                                     response.data_parts = [root.data]
                                     logger.info("Extracted authoritative data from artifacts")
+
+            # Status.message에서 데이터 추출 (아티팩트가 없거나 추가 보강)
+            if (not response.text_parts and not response.data_parts) and hasattr(task, 'status'):
+                status_message = getattr(task.status, 'message', None)
+                if status_message and hasattr(status_message, 'parts') and status_message.parts:
+                    logger.info("Extracting from status.message as authoritative source")
+                    for part in status_message.parts:
+                        root = getattr(part, 'root', None)
+                        if root:
+                            if hasattr(root, 'text') and root.text:
+                                response.text_parts = [root.text]
+                                text_accumulator = root.text
+                                logger.info(f"Extracted text from status.message: {len(root.text)} chars")
+                            elif hasattr(root, 'data') and root.data:
+                                response.data_parts = [root.data]
+                                logger.info("Extracted data from status.message")
 
             # History에서 데이터 추출 (fallback)
             if hasattr(task, 'history') and task.history and not response.text_parts and not response.data_parts:
@@ -1286,15 +1335,57 @@ class A2AClientManagerV2:
             dict: ``data_parts``, ``full_message_history``(미구현),
                 ``streaming_text``, ``event_count`` 포함
         """
-        # 일단 기본 구현 - 추후 히스토리 수집 로직 추가
-        response = await self.data_client.send(data)
+        # 히스토리 수집/텍스트 활용을 위해 엔진 코어를 직접 사용
+        # 메시지 생성 후 UnifiedResponse를 받아 텍스트/데이터를 모두 반영
+        message = Message(
+            role=Role.user,
+            parts=[Part(root=DataPart(data=data))],
+            message_id=str(uuid4()),
+        )
 
-        return {
-            "data_parts": response.data_parts,
+        unified = await self.engine.execute_with_retry(
+            self.engine.send_message_core,
+            message,
+        )
+
+        # 루트 결과 구성
+        root: Dict[str, Any] = {
+            "data_parts": unified.data_parts,
             "full_message_history": [],  # TODO: 히스토리 수집 구현
-            "streaming_text": "",
-            "event_count": response.event_count,
+            "streaming_text": "".join(unified.text_parts) if unified.text_parts else "",
+            "event_count": unified.event_count,
         }
+
+        # 텍스트: 병합 텍스트가 있으면 우선 노출
+        if unified.merged_text:
+            root["text_content"] = unified.merged_text
+
+        # 데이터: 병합 결과 우선, 없으면 첫 data_part 노출
+        if unified.merged_data:
+            root["data_content"] = unified.merged_data
+        elif unified.data_parts:
+            first = unified.data_parts[0]
+            root["data_content"] = first
+
+            # text_content가 비어 있으면 data_parts의 raw_analysis로 보강
+            if not root.get("text_content"):
+                text_candidate = first.get("result", {}).get("raw_analysis")
+                if text_candidate:
+                    root["text_content"] = text_candidate
+
+            # 메타 신호 보강: analysis_signal → metadata.final_signal
+            final_sig = first.get("result", {}).get("analysis_signal")
+            if final_sig:
+                meta = dict(root.get("metadata", {}))
+                meta["final_signal"] = final_sig
+                root["metadata"] = meta
+
+        # 안전 기본값 보강
+        root.setdefault("agent_type", "AnalysisA2AAgent")
+        root.setdefault("status", "completed")
+        root.setdefault("final", True)
+
+        return root
 
     async def send_data_merged(
         self,

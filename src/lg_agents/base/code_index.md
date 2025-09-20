@@ -22,7 +22,6 @@ base/
 ├── base_graph_agent.py            # BaseGraphAgent 추상 클래스
 ├── base_graph_state.py            # 상태 관리 TypedDict
 ├── error_handling.py              # 에러 처리 데코레이터
-├── interrupt_manager.py           # 인터럽트 및 Human-in-the-Loop 관리
 ├── mcp_config.py                  # MCP 서버 설정 관리
 └── mcp_loader.py                  # MCP 도구 동적 로더
 ```
@@ -123,41 +122,7 @@ def with_timeout(func):
 - Fallback 메커니즘
 - 에러 로깅 및 알림
 
-### 4️⃣ **interrupt_manager.py** - 인터럽트 관리
-
-#### 주요 클래스
-- `InterruptManager`: 인터럽트 및 Human-in-the-Loop 관리
-
-#### 주요 기능
-```python
-class InterruptManager:
-    def check_interrupt_condition(self, state: BaseState) -> bool:
-        """인터럽트 조건 확인"""
-        
-    async def request_human_approval(self, context: Dict) -> bool:
-        """Human 승인 요청"""
-        
-    def set_timeout(self, seconds: int):
-        """타임아웃 설정"""
-        
-    def handle_timeout(self):
-        """타임아웃 처리"""
-```
-
-#### Human-in-the-Loop 트리거
-- 고위험 거래 감지
-- VaR 임계값 초과
-- 낮은 신뢰도 점수
-- 시스템 이상 감지
-- 대규모 포지션 변경
-
-#### 승인 프로세스
-1. 컨텍스트 준비
-2. 승인 요청 전송
-3. 응답 대기 (타임아웃 포함)
-4. 결과 처리
-
-### 5️⃣ **mcp_config.py** - MCP 설정 관리
+### 4️⃣ **mcp_config.py** - MCP 설정 관리
 
 #### 설정 구조
 ```python
@@ -194,7 +159,7 @@ MCP_SERVERS = {
 }
 ```
 
-### 6️⃣ **mcp_loader.py** - MCP 도구 로더
+### 5️⃣ **mcp_loader.py** - MCP 도구 로더
 
 #### 주요 클래스
 - `MCPToolLoader`: MCP 도구 동적 로딩 관리

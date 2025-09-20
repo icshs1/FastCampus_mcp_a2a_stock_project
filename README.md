@@ -1,7 +1,7 @@
 # FastCampus! LangGraph, MCP, A2A 프로토콜 기반 멀티 에이전트 시스템
 
 **멀티 에이전트 A2A 기반 주식 투자 시스템**으로,  
-실시간 데이터 수집부터 리스크 관리, Human-in-the-Loop 승인까지 구성합니다.
+실시간 데이터 수집부터 리스크 관리, Human-in-the-Loop 까지 구성합니다.
 
 ---
 
@@ -23,7 +23,7 @@
 
 - **워크플로우**: 8-노드 데이터 파이프라인 (수집→검증→통합→품질평가)
 - **핵심 기능**: 멀티소스 데이터 수집, 품질 검증, 표준화
-- **특징**: 5개 도메인 MCP 서버 통합, 데이터 품질 점수(0.0~1.0) 계산
+- **특징**: 4개 데이터 소스 통합(키움 2 + 뉴스/검색 2), 데이터 품질 점수(0.0~1.0) 계산
 
 #### **AnalysisAgent** - 4차원 분석 엔진
 
@@ -41,25 +41,27 @@
 
 #### **5개 키움증권 REST API 기반 MCP 서버**
 
-- `market_domain` (Port 8031): 실시간 시세, 차트, 순위, 기술적 지표
-- `info_domain` (Port 8032): 종목 정보, ETF, 테마, 기업 정보
-- `trading_domain` (Port 8030): 주문 관리, 계좌 정보, 거래 내역, Mock 거래
-- `investor_domain` (Port 8033): 기관/외국인 동향, 투자자 행동 분석
-- `portfolio_domain` (Port 8034): 자산 관리, VaR 계산, Sharpe ratio, 리스크 메트릭
+- `kiwoom-market-mcp` (Port 8031): 실시간 시세, 차트, 순위, 기술적 지표
+- `kiwoom-info-mcp` (Port 8032): 종목 정보, ETF, 테마, 기업 정보
+- `kiwoom-trading-mcp` (Port 8030): 주문 관리, 계좌 정보, 거래 내역, Mock 거래
+- `kiwoom-investor-mcp` (Port 8033): 기관/외국인 동향, 투자자 행동 분석
+- `kiwoom-portfolio-mcp` (Port 8034): 자산 관리, VaR 계산, Sharpe ratio, 리스크 메트릭
 
-#### **3개 외부 데이터 수집 & 분석 MCP 서버**
+#### **5개 외부 데이터 수집 & 분석 MCP 서버**
 
-- `financial_analysis_mcp` (Port 8040): 재무 분석, 밸류에이션 도구
-- `naver_news_mcp` (Port 8050): 뉴스 수집, 감성 분석
-- `tavily_search_mcp` (Port 3020): 웹 검색, 시장 동향 조사
+- `financial-analysis-mcp` (Port 8040): 재무 분석, 밸류에이션 도구
+- `macroeconomic-analysis-mcp` (Port 8041): 거시경제 지표 수집·분석
+- `stock-analysis-mcp` (Port 8042): 종목 기반 종합 분석 도구
+- `naver-news-mcp` (Port 8050): 뉴스 수집, 감성 분석
+- `tavily-search-mcp` (Port 3020): 웹 검색, 시장 동향 조사
 
 #### **에이전트별 MCP 서버 연결 매핑**
 
 | Agent | Connected MCP Servers | Primary Functions |
 |-------|----------------------|------------------|
-| **DataCollectorAgent** | market_domain, info_domain, investor_domain, naver_news_mcp, tavily_search_mcp | 멀티소스 데이터 수집, 품질 검증 |
-| **AnalysisAgent** | market_domain, info_domain, financial_analysis_mcp, portfolio_domain | 통합 분석, 매수-매도 신호 생성 |
-| **TradingAgent** | trading_domain, portfolio_domain | 주문 실행, 리스크 관리, Human-in-the-loop |
+| **DataCollectorAgent** | kiwoom-market-mcp, kiwoom-info-mcp, naver-news-mcp, tavily-search-mcp | 멀티소스 데이터 수집, 품질 검증 |
+| **AnalysisAgent** | stock-analysis-mcp, financial-analysis-mcp, macroeconomic-analysis-mcp, naver-news-mcp, tavily-search-mcp | 통합 분석, 매수-매도 신호 생성 |
+| **TradingAgent** | trading-domain, portfolio-domain | 주문 실행, 리스크 관리, Human-in-the-loop |
 | **SupervisorAgent** | No direct connections | 워크플로우 조정, Agent 오케스트레이션 |
 
 ## 🛠️ 기술 스택
@@ -216,8 +218,8 @@ cp .env.example .env
 OPENAI_API_KEY=your_openai_api_key
 
 # 키움증권 API (필수)
-KIWOOM_API_KEY=your_api_key
-KIWOOM_SECRET_KEY=your_secret_key
+KIWOOM_APP_KEY=your_app_key
+KIWOOM_APP_SECRET=your_app_secret
 KIWOOM_ACCOUNT_NO=your_account_number
 
 # TAVILY API KEY (필수)
@@ -230,6 +232,9 @@ NAVER_CLIENT_SECRET=your_naver_client_secret
 # FRED API
 FRED_API_KEY=your_fred_api_key
 
+# ECOS(한국은행 경제통계시스템) API
+ECOS_API_KEY=your_ecos_api_key
+
 # DART(금융감독원 전자공시시스템) API
 DART_API_KEY=your_dart_api_key
 ```
@@ -240,7 +245,7 @@ DART_API_KEY=your_dart_api_key
 
 #### A2A (Agent-to-Agent) Protocol
 
-- [a2a-js_0.3.1.txt](docs/a2a-js_0.3.1.txt) - A2A JavaScript 프로토콜 문서
+- [a2a-js_0.3.1.txt](docs/a2a-js_0.3.1.txt) - A2A JavaScript 프로토콜 문서 (0.3.0과 호환)
 - [a2a-python_0.3.0.txt](docs/a2a-python_0.3.0.txt) - A2A Python 프로토콜 문서
 - [a2a-samples_0.3.0.txt](docs/a2a-samples_0.3.0.txt) - A2A 샘플 코드 및 예제
 

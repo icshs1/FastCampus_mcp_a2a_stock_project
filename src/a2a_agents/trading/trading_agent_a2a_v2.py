@@ -1,16 +1,15 @@
 """
-Trading Agent with A2A Integration.
+A2A 통합을 갖춘 트레이딩 에이전트.
 
-This module provides a Trading agent that implements the standardized
-A2A interface with Human-in-the-Loop approval for risk management.
+이 모듈은 위험 관리에 대한 Human-in-the-Loop 승인을 통해 표준화된
+A2A 인터페이스를 구현하는 트레이딩 에이전트를 제공합니다.
 
-Beginner notes:
-    - Approval flow: High-risk operations return ``status='input_required'``
-      with an approval request payload. Clients must respond with
-      "approve/승인" or "reject/거부" as a follow-up message.
-    - Risk threshold: ``risk_threshold`` gates when approval is required.
-      Additional safeguards include large order detection and number of
-      simultaneous pending orders.
+참고사항:
+    - 승인 절차: 고위험 작업의 경우 ``status='input_required'``와 함께
+      승인 요청 페이로드를 반환합니다. 클라이언트는 후속 메시지로
+      "approve/승인" 또는 "reject/거부"로 응답해야 합니다.
+    - 위험 임계값: ``risk_threshold``는 승인이 필요한 시점을 결정합니다.
+      추가 안전장치로는 대량 주문 감지와 동시 보류 주문 수가 있습니다.
 """
 
 from datetime import datetime
@@ -37,13 +36,13 @@ load_env_file()
 
 class TradingA2AAgent(BaseA2AAgent, BaseGraphAgent):
     """
-    Trading Agent with A2A integration and Human-in-the-Loop support.
+    A2A 통합 및 Human-in-the-Loop 지원을 갖춘 트레이딩 에이전트.
 
-    This agent handles:
-    - Order execution and management
-    - Risk assessment (VaR, Sharpe ratio)
-    - Portfolio optimization
-    - Human approval workflow for high-risk trades
+    이 에이전트는 다음을 처리합니다:
+    - 주문 실행 및 관리
+    - 위험 평가 (VaR, 샤프 비율)
+    - 포트폴리오 최적화
+    - 고위험 거래에 대한 인간 승인 워크플로
     """
 
     def __init__(
@@ -54,26 +53,26 @@ class TradingA2AAgent(BaseA2AAgent, BaseGraphAgent):
         risk_threshold: float = 0.15  # 15% VaR threshold
     ):
         """
-        Initialize Trading A2A Agent.
+        트레이딩 A2A 에이전트를 초기화합니다.
 
         Args:
-            model: LLM model (default: gpt-4o-mini)
-            is_debug: Debug mode flag
-            checkpointer: Checkpoint manager (default: MemorySaver)
-            risk_threshold: VaR threshold for requiring approval
+            model: LLM 모델 (기본값: gpt-4.1-mini)
+            is_debug: 디버그 모드 플래그
+            checkpointer: 체크포인트 관리자 (기본값: MemorySaver)
+            risk_threshold: 승인이 필요한 VaR 임계값
         """
         BaseA2AAgent.__init__(self)
 
-        # Initialize the model
+        # 모델 초기화
         self.model = model or init_chat_model(
-            model="gpt-4o-mini",
+            model="gpt-4.1-mini",
             temperature=0,
             model_provider="openai"
         )
         self.checkpointer = checkpointer or MemorySaver()
         self.risk_threshold = risk_threshold
 
-        # Initialize BaseGraphAgent with required parameters
+        # 필요한 매개변수로 BaseGraphAgent 초기화
         BaseGraphAgent.__init__(
             self,
             model=self.model,
@@ -85,10 +84,10 @@ class TradingA2AAgent(BaseA2AAgent, BaseGraphAgent):
 
         self.tools = []
 
-        # Stream buffer for managing LLM output
+        # LLM 출력 관리를 위한 스트림 버퍼
         self.stream_buffer = A2AStreamBuffer(max_size=100)
 
-        # Track trading state
+        # 트레이딩 상태 추적
         self.pending_orders = []
         self.executed_trades = []
         self.portfolio_state = {}
@@ -101,20 +100,20 @@ class TradingA2AAgent(BaseA2AAgent, BaseGraphAgent):
         self.approval_status = "PENDING"
 
     async def initialize(self):
-        """Initialize the agent with MCP tools and create the graph.
+        """MCP 도구로 에이전트를 초기화하고 그래프를 생성합니다.
 
         Raises:
-            RuntimeError: If tools cannot be loaded or the graph fails to build.
+            RuntimeError: 도구를 로드할 수 없거나 그래프 생성에 실패한 경우
         """
         try:
-            # Load MCP tools
+            # MCP 도구 로드
             self.tools = await load_trading_tools()
             logger.info(f" Loaded {len(self.tools)} MCP tools for Trading")
 
-            # Get system prompt
+            # 시스템 프롬프트 가져오기
             system_prompt = get_prompt("trading", "system", tool_count=len(self.tools))
 
-            # Create the reactive agent graph
+            # 반응형 에이전트 그래프 생성
             config = RunnableConfig(recursion_limit=10)
             self.graph = create_react_agent(
                 model=self.model,
@@ -138,43 +137,42 @@ class TradingA2AAgent(BaseA2AAgent, BaseGraphAgent):
         config: Optional[Dict[str, Any]] = None
     ) -> A2AOutput:
         """
-        Execute the agent with A2A-compatible input and output.
+        A2A 호환 입력 및 출력으로 에이전트를 실행합니다.
 
-        Includes Human-in-the-Loop approval for high-risk trades.
+        고위험 거래에 대한 Human-in-the-Loop 승인을 포함합니다.
 
         Args:
-            input_dict: Trading request (often ``{"messages": [...]}``).
-            config: Optional execution config; default ``thread_id`` is used
-                when omitted.
+            input_dict: 트레이딩 요청 (보통 ``{"messages": [...]}`` 형태)
+            config: 선택적 실행 설정. 생략 시 기본 ``thread_id`` 사용
 
         Returns:
-            A2AOutput: Standardized output for A2A processing
+            A2AOutput: A2A 처리를 위한 표준화된 출력
         """
         if not self.graph:
             await self.initialize()
 
         try:
-            # Reset tracking variables
+            # 추적 변수 초기화
             self.pending_orders.clear()
             self.executed_trades.clear()
             self.requires_approval = False
             self.approval_status = "PENDING"
 
-            # Check if this is a resume operation (Human response)
+            # 재개 작업인지 확인 (인간 응답)
             if self._is_approval_response(input_dict):
                 return await self._handle_approval_response(input_dict)
 
-            # Execute the graph
+            # 그래프 실행
             result = await self.graph.ainvoke(
                 input_dict,
                 config=config or {"configurable": {"thread_id": str(uuid4())}}
             )
 
-            # Check if approval is needed
+            # 승인 필요 여부 확인
             if self._requires_human_approval():
                 return self._create_approval_request()
 
-            # Extract final output
+            # 최종 출력 추출
             return self.extract_final_output(result)
 
         except Exception as e:
@@ -184,17 +182,17 @@ class TradingA2AAgent(BaseA2AAgent, BaseGraphAgent):
         self,
         event: Dict[str, Any]
     ) -> Optional[A2AOutput]:
-        """Translate LangGraph event to A2A streaming update.
+        """LangGraph 이벤트를 A2A 스트리밍 업데이트로 변환합니다.
 
-        Emits human-friendly text for order/risk/portfolio phases.
+        주문/위험/포트폴리오 단계에 대해 사용자 친화적인 텍스트를 출력합니다.
         """
         event_type = event.get("event", "")
 
-        # Handle LLM streaming
+        # LLM 스트리밍 처리
         if event_type == "on_llm_stream":
             content = self.extract_llm_content(event)
             if content and self.stream_buffer.add(content):
-                # Buffer is full, flush it
+                # 버퍼가 가득 찼으므로 비우기
                 return self.create_a2a_output(
                     status="working",
                     text_content=self.stream_buffer.flush(),
@@ -202,11 +200,11 @@ class TradingA2AAgent(BaseA2AAgent, BaseGraphAgent):
                     metadata={"event_type": "llm_stream"}
                 )
 
-        # Handle tool execution events
+        # 도구 실행 이벤트 처리
         elif event_type == "on_tool_start":
             tool_name = event.get("name", "unknown")
 
-            # Track different tool types
+            # 다양한 도구 유형 추적
             if "order" in tool_name.lower():
                 return self.create_a2a_output(
                     status="working",
@@ -241,18 +239,18 @@ class TradingA2AAgent(BaseA2AAgent, BaseGraphAgent):
                     }
                 )
 
-        # Handle tool completion with results
+        # 결과와 함께 도구 완료 처리
         elif event_type == "on_tool_end":
             tool_output = event.get("data", {}).get("output", {})
             tool_name = event.get("name", "unknown")
 
-            # Process risk assessment results
+            # 위험 평가 결과 처리
             if "risk" in tool_name.lower() or "var" in tool_name.lower():
                 if isinstance(tool_output, dict):
                     var_ratio = tool_output.get("var_ratio", 0)
                     self.risk_metrics["var_ratio"] = var_ratio
 
-                    # Check if approval is needed
+                    # 승인 필요 여부 확인
                     if var_ratio > self.risk_threshold:
                         self.requires_approval = True
                         return self.create_a2a_output(
@@ -266,7 +264,7 @@ class TradingA2AAgent(BaseA2AAgent, BaseGraphAgent):
                             metadata={"event_type": "risk_warning"}
                         )
 
-            # Process order results
+            # 주문 결과 처리
             elif "order" in tool_name.lower():
                 if isinstance(tool_output, dict):
                     order_id = tool_output.get("order_id")
@@ -282,9 +280,9 @@ class TradingA2AAgent(BaseA2AAgent, BaseGraphAgent):
                             metadata={"event_type": "order_created"}
                         )
 
-        # Handle completion events
+        # 완료 이벤트 처리
         elif self.is_completion_event(event):
-            # Flush any remaining buffer content
+            # 남은 버퍼 내용 비우기
             if self.stream_buffer.has_content():
                 return self.create_a2a_output(
                     status="working",
@@ -299,27 +297,27 @@ class TradingA2AAgent(BaseA2AAgent, BaseGraphAgent):
         self,
         state: Dict[str, Any]
     ) -> A2AOutput:
-        """Create the final ``A2AOutput`` including risk and approval fields."""
+        """위험 및 승인 필드를 포함한 최종 ``A2AOutput``을 생성합니다."""
         try:
-            # Extract messages from state
+            # 상태에서 메시지 추출
             messages = state.get("messages", [])
 
-            # Get the last AI message as trading summary
+            # 마지막 AI 메시지를 트레이딩 요약으로 가져오기
             trading_summary = ""
             for msg in reversed(messages):
                 if hasattr(msg, "content") and msg.__class__.__name__ == "AIMessage":
                     trading_summary = msg.content
                     break
 
-            # Determine trading signal
+            # 트레이딩 신호 결정
             trading_signal = self._extract_trading_action(trading_summary)
 
-            # Calculate total order amount
+            # 총 주문 금액 계산
             total_amount = sum(
                 order.get("amount", 0) for order in self.pending_orders
             )
 
-            # Prepare structured data
+            # 구조화된 데이터 준비
             data_content = {
                 "success": True,
                 "result": {
@@ -342,10 +340,10 @@ class TradingA2AAgent(BaseA2AAgent, BaseGraphAgent):
                 "workflow_status": "completed" if not self.requires_approval else "input_required"
             }
 
-            # Determine final status
+            # 최종 상태 결정
             status = "input_required" if self.requires_approval else "completed"
 
-            # Create final output
+            # 최종 출력 생성
             return self.create_a2a_output(
                 status=status,
                 text_content=trading_summary or "거래 준비가 완료되었습니다.",
@@ -366,24 +364,24 @@ class TradingA2AAgent(BaseA2AAgent, BaseGraphAgent):
     # Human-in-the-Loop methods
 
     def _requires_human_approval(self) -> bool:
-        """Return True when a human must approve before proceeding."""
-        # Check VaR threshold
+        """진행하기 전에 인간의 승인이 필요한 경우 True를 반환합니다."""
+        # VaR 임계값 확인
         if self.risk_metrics["var_ratio"] > self.risk_threshold:
             return True
 
-        # Check for large orders
+        # 대량 주문 확인
         total_amount = sum(order.get("amount", 0) for order in self.pending_orders)
         if total_amount > 10000000:  # 10M KRW threshold
             return True
 
-        # Check for multiple orders
+        # 다중 주문 확인
         if len(self.pending_orders) > 5:
             return True
 
         return False
 
     def _create_approval_request(self) -> A2AOutput:
-        """Build an approval request output for human review."""
+        """인간 검토를 위한 승인 요청 출력을 생성합니다."""
         approval_message = self._build_approval_message()
 
         return self.create_a2a_output(
@@ -405,7 +403,7 @@ class TradingA2AAgent(BaseA2AAgent, BaseGraphAgent):
         )
 
     def _build_approval_message(self) -> str:
-        """Create the human-facing message content for approval UI."""
+        """승인 UI를 위한 사용자 대상 메시지 내용을 생성합니다."""
         total_amount = sum(order.get("amount", 0) for order in self.pending_orders)
         var_ratio = self.risk_metrics["var_ratio"]
 
@@ -428,7 +426,7 @@ class TradingA2AAgent(BaseA2AAgent, BaseGraphAgent):
         return message
 
     def _is_approval_response(self, input_dict: Dict[str, Any]) -> bool:
-        """Detect whether the latest message contains an approval decision."""
+        """최신 메시지에 승인 결정이 포함되어 있는지 감지합니다."""
         messages = input_dict.get("messages", [])
         if not messages:
             return False
@@ -441,13 +439,13 @@ class TradingA2AAgent(BaseA2AAgent, BaseGraphAgent):
         return False
 
     async def _handle_approval_response(self, input_dict: Dict[str, Any]) -> A2AOutput:
-        """Apply a user's approval/denial decision and finalize output."""
+        """사용자의 승인/거부 결정을 적용하고 출력을 마무리합니다."""
         messages = input_dict.get("messages", [])
         response = messages[-1].content.lower() if messages else ""
 
         if "approve" in response or "승인" in response:
             self.approval_status = "APPROVED"
-            # Execute pending orders
+            # 보류 중인 주문 실행
             for order in self.pending_orders:
                 self.executed_trades.append(order)
 
@@ -474,10 +472,10 @@ class TradingA2AAgent(BaseA2AAgent, BaseGraphAgent):
                 metadata={"approval_processed": True}
             )
 
-    # Helper methods
+    # 도우미 메서드
 
     def _extract_symbols_from_orders(self) -> list[str]:
-        """Return the unique set of symbols referenced by pending/executed orders."""
+        """보류 중인/실행된 주문에서 참조되는 고유한 심볼 집합을 반환합니다."""
         symbols = set()
         for order in self.pending_orders + self.executed_trades:
             if "symbol" in order:
@@ -485,7 +483,7 @@ class TradingA2AAgent(BaseA2AAgent, BaseGraphAgent):
         return list(symbols)
 
     def _extract_trading_action(self, text: str) -> str:
-        """Parse BUY/SELL/HOLD intent from unstructured text."""
+        """비구조화된 텍스트에서 매수/매도/보유 의도를 파싱합니다."""
         text_lower = text.lower()
 
         if "매수" in text or "buy" in text_lower:
@@ -498,7 +496,7 @@ class TradingA2AAgent(BaseA2AAgent, BaseGraphAgent):
         return "PENDING"
 
     def _determine_risk_level(self) -> str:
-        """Map VaR ratio to qualitative risk tiers."""
+        """VaR 비율을 질적 위험 등급으로 매핑합니다."""
         var_ratio = self.risk_metrics["var_ratio"]
 
         if var_ratio > 0.20:
@@ -509,7 +507,7 @@ class TradingA2AAgent(BaseA2AAgent, BaseGraphAgent):
             return "LOW"
 
     def _get_approval_reason(self) -> str:
-        """Explain why approval is required for the current state."""
+        """현재 상태에서 승인이 필요한 이유를 설명합니다."""
         reasons = []
 
         if self.risk_metrics["var_ratio"] > self.risk_threshold:
@@ -533,16 +531,16 @@ async def create_trading_a2a_agent(
     risk_threshold: float = 0.15
 ) -> TradingA2AAgent:
     """
-    Create and initialize a Trading A2A Agent.
+    트레이딩 A2A 에이전트를 생성하고 초기화합니다.
 
     Args:
-        model: LLM model (default: gpt-4o-mini)
-        is_debug: Debug mode flag
-        checkpointer: Checkpoint manager
-        risk_threshold: VaR threshold for approval
+        model: LLM 모델 (기본값: gpt-4.1-mini)
+        is_debug: 디버그 모드 플래그
+        checkpointer: 체크포인트 관리자
+        risk_threshold: 승인이 필요한 VaR 임계값
 
     Returns:
-        TradingA2AAgent: Initialized agent instance
+        TradingA2AAgent: 초기화된 에이전트 인스턴스
     """
     agent = TradingA2AAgent(model, is_debug, checkpointer, risk_threshold)
     await agent.initialize()
