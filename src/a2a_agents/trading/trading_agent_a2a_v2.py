@@ -340,20 +340,33 @@ class TradingA2AAgent(BaseA2AAgent, BaseGraphAgent):
                 "workflow_status": "completed" if not self.requires_approval else "input_required"
             }
 
+            # 주문 정보 미제공(요청 전 단계) 감지:
+            # - 요약에서 매수/매도/보유 의도가 파싱되지 않음 (PENDING)
+            # - 생성된 보류 주문도 없음
+            missing_trading_info = (trading_signal == "PENDING" and len(self.pending_orders) == 0)
+
             # 최종 상태 결정
-            status = "input_required" if self.requires_approval else "completed"
+            if self.requires_approval:
+                status = "input_required"
+            elif missing_trading_info:
+                status = "input_required"
+                # 워크플로우 상태도 입력 요구로 설정
+                data_content["workflow_status"] = "input_required"
+            else:
+                status = "completed"
 
             # 최종 출력 생성
             return self.create_a2a_output(
                 status=status,
                 text_content=trading_summary or "거래 준비가 완료되었습니다.",
                 data_content=data_content,
-                final=not self.requires_approval,
+                final=(status == "completed"),
                 requires_approval=self.requires_approval,
                 metadata={
-                    "execution_complete": not self.requires_approval,
+                    "execution_complete": (status == "completed"),
                     "pending_orders": len(self.pending_orders),
-                    "risk_level": self._determine_risk_level()
+                    "risk_level": self._determine_risk_level(),
+                    **({"input_required_reason": "missing_order_details"} if missing_trading_info else {})
                 }
             )
 

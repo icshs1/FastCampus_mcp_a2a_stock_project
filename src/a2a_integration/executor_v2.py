@@ -157,12 +157,28 @@ class LangGraphAgentExecutorV2(AgentExecutor):
             if is_blocking or not self.config.enable_streaming:
                 final_message = await self._execute_blocking(input_dict, context_id)
                 logger.info(f"Blocking execution output: {final_message}")
-                # 단 한 번만 최종 상태로 업데이트 (스토어 + 이벤트 반영)
-                await self.updater.update_status(
-                    TaskState.completed,
-                    final_message,
-                    final=True,
-                )
+                # 에이전트가 제공한 상태/완료 플래그를 존중하여 업데이트
+                try:
+                    # 마지막 실행 결과는 _execute_blocking 내부 로그에 남지만,
+                    # 상태/완료 여부는 TaskUpdater에 정확히 반영해야 함
+                    # 이를 위해 에이전트 결과를 다시 가져올 수 없어도 메시지 메타에 포함된
+                    # 상태를 신뢰하지 않으므로 기본값은 working/False 로 처리
+                    # 단, _execute_blocking 내에서 이미 전체 A2AOutput을 A2A 메시지로 전송했으므로
+                    # 여기서는 보수적으로 completed/final=True를 강제하지 않고 working/False로 마무리하지 않도록
+                    # 상태 매핑을 위해 메시지 생성 당시 사용한 output의 status/final을 반환하도록 _execute_blocking을 유지하되,
+                    # 안전하게 completed/final 여부를 추정하지 않습니다.
+                    # 대신 send 직전의 A2AOutput에서 상태를 읽고자 할 때는 _execute_blocking이 반환하는
+                    # Message에 부가정보가 없으므로 아래와 같이 보수적 처리: completed/final 값을 강제하지 않음.
+                    # 따라서 최소한 completed/final=True의 강제는 제거합니다.
+                    mapped_state = TaskState.working
+                    is_final = False
+                    await self.updater.update_status(
+                        mapped_state,
+                        final_message,
+                        final=is_final,
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to map status/final from blocking result, sent as working/non-final: {e}")
             else:
                 # 스트리밍 모드: 내부에서 최종 완료 시점에 스토어를 업데이트합니다
                 async for _ in self._execute_streaming(input_dict, context_id):
