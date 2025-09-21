@@ -10,8 +10,8 @@
 포트: 8030
 
 Beginner notes:
-    - 모든 주문은 내부 위험 관리 체크를 통과해야 합니다. 실패 시 상세
-      사유가 ``StandardResponse.error``에 포함됩니다.
+    - 모든 주문은 내부 위험 관리 체크를 통과해야 합니다. 
+    실패 시 상세 사유가 ``StandardResponse.error``에 포함됩니다.
     - Human-in-the-Loop(승인)과의 연동은 상위 A2A 에이전트(예: TradingA2AAgent)
       측에서 수행됩니다. 본 서버는 위험 평가와 API 호출에 집중합니다.
 """
@@ -124,7 +124,7 @@ class TradingDomainServer(KiwoomDomainServer):
     """
     키움 Trading Domain 서버 - 거래 실행 핵심 엔진.
 
-    ️ 아키텍처 위치:
+    아키텍처 위치:
     - **Layer 1 (MCP Server)**: 주문 실행 제공자
     - **Port**: 8030
     - **Domain**: trading_domain

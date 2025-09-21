@@ -24,7 +24,7 @@ async def create_trading_agent(model=None, is_debug: bool = False):
     """Trading Agent 생성
 
     Args:
-        model: LLM 모델 (기본값: gpt-5-mini)
+        model: LLM 모델 (기본값: gpt-4.1-mini)
         is_debug: 디버그 모드 여부
 
     Returns:
