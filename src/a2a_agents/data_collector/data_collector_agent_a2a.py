@@ -3,7 +3,6 @@
 DataCollectorAgent A2A 서버 - 공식 A2A 프로토콜 준수
 
 공식 A2A SDK 패턴을 사용하여 DataCollectorAgent를 A2A 프로토콜로 제공합니다.
-BaseAgent + GenericAgentExecutor 패턴을 통해 스트리밍 에러를 완전히 해결합니다.
 
 Core Responsibilities:
     - 실시간 시장 데이터 수집 (시세, 차트, 거래량)

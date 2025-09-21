@@ -5,7 +5,6 @@ A2A 통합이 적용된 데이터 수집(DataCollector) 에이전트 V2.
 데이터 수집 에이전트를 제공합니다.
 
 메모:
-    - 내부 버퍼가 "읽을 만하다"고 판단할 때만 스트리밍 업데이트를 내보냅니다.
       너무 작은 토큰 조각은 소음을 줄이기 위해 버퍼링됩니다.
     - 최종 출력에는 도구 호출 횟수와 수집된 종목 수 등의 카운트 정보가 포함되어,
       감독 에이전트가 자유 텍스트를 파싱하지 않고도 진행 상황을 요약할 수 있습니다.
@@ -24,7 +23,6 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import create_react_agent
 
 from src.lg_agents.base.a2a_interface import A2AOutput, A2AStreamBuffer, BaseA2AAgent
-from src.lg_agents.base.base_graph_agent import BaseGraphAgent
 from src.lg_agents.base.mcp_config import load_data_collector_tools
 from src.lg_agents.prompts import get_prompt
 from src.lg_agents.util import load_env_file
@@ -34,7 +32,7 @@ logger = structlog.get_logger(__name__)
 load_env_file()
 
 
-class DataCollectorA2AAgent(BaseA2AAgent, BaseGraphAgent):
+class DataCollectorA2AAgent(BaseA2AAgent):
     """
     A2A 통합을 지원하는 데이터 수집 에이전트.
 
@@ -64,16 +62,6 @@ class DataCollectorA2AAgent(BaseA2AAgent, BaseGraphAgent):
             model_provider="openai"
         )
         self.checkpointer = checkpointer or MemorySaver()
-
-        # Initialize BaseGraphAgent with required parameters
-        BaseGraphAgent.__init__(
-            self,
-            model=self.model,
-            checkpointer=self.checkpointer,
-            is_debug=is_debug,
-            lazy_init=True,  # Use lazy initialization for A2A agents
-            agent_name="DataCollectorA2AAgent"
-        )
 
         self.tools = []
 

@@ -56,13 +56,13 @@ async def create_data_collector_agent(
         system_prompt = get_prompt("data_collector", "system", tool_count=len(tools))
 
         model = model or init_chat_model(
-            model="gpt-4.1",
-            temperature=0,
+            model="gpt-4.1-mini",
+            temperature=0, # NOTE: gpt-5 모델에서는 temperature 설정이 필요 없음 -> verbosity
             model_provider="openai",
         )
 
-        checkpointer = MemorySaver()
-        config = RunnableConfig(recursion_limit=10)
+        checkpointer = checkpointer or MemorySaver()
+        config = RunnableConfig(recursion_limit=10) # default: 25
 
         agent = create_react_agent(
             model=model,
@@ -75,6 +75,7 @@ async def create_data_collector_agent(
         )
 
         logger.info(" DataCollector Agent created successfully with create_react_agent")
+        # NOTE: CompiledStateGraph 반환함으로써 바로 실행이 가능한 객체를 반환함
         return agent
     except Exception as e:
         logger.error(f"Failed to create DataCollector Agent: {e}")

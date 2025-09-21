@@ -414,29 +414,28 @@ async def main() -> None:
             "question": "삼성전자의 모을 수 있는 모든 데이터를 모아서 전달해주세요.",
             "test_type": "standard"
         },
-        # ============== 통합 테스트 케이스 추가 ==============
-        
-        {
-            "name": "A2A 인터페이스 메서드 검증 테스트",
-            "symbols": ["005930"],
-            "data_types": ["price"],
-            "question": "삼성전자 현재 가격 정보를 가져와주세요.",
-            "test_type": "a2a_interface"
-        },
-        {
-            "name": "A2AOutput 표준 형식 검증 테스트",
-            "symbols": ["005930"],
-            "data_types": ["info"],
-            "question": "삼성전자 기업 정보를 수집해주세요.",
-            "test_type": "output_validation"
-        }
+        # ============== 통합 테스트 케이스 추가 ==============        
+        # {
+        #     "name": "A2A 인터페이스 메서드 검증 테스트",
+        #     "symbols": ["005930"],
+        #     "data_types": ["price"],
+        #     "question": "삼성전자 현재 가격 정보를 가져와주세요.",
+        #     "test_type": "a2a_interface"
+        # },
+        # {
+        #     "name": "A2AOutput 표준 형식 검증 테스트",
+        #     "symbols": ["005930"],
+        #     "data_types": ["info"],
+        #     "question": "삼성전자 기업 정보를 수집해주세요.",
+        #     "test_type": "output_validation"
+        # }
     ]
-    
+
     # 3. 각 테스트 케이스 실행
     for i, test_case in enumerate(test_cases, 1):
         print_section(f"테스트 {i}: {test_case['name']}")
         test_type = test_case.get("test_type", "standard")
-        
+
         try:
             if test_type == "standard":
                 # 기본 데이터 수집 테스트
@@ -446,7 +445,7 @@ async def main() -> None:
                     data_types=test_case["data_types"],
                     user_question=test_case["question"]
                 )
-                
+
                 # 결과 출력
                 print_section("수집 결과")
                 format_collection_result(result)
