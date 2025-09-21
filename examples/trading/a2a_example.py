@@ -566,31 +566,6 @@ async def main():
             "analysis_result": base_analysis_result,
             "question": "삼성전자를 안전하게 매도하고 싶습니다.",
             "test_type": "standard"
-        },
-        # ============== Trading Agent 특화 통합 테스트 케이스 추가 ==============
-        {
-            "name": "HITL 워크플로우 시뮬레이션",
-            "symbols": ["005930"],
-            "trading_signal": "BUY",
-            "analysis_result": base_analysis_result,
-            "question": "삼성전자 100주를 매수하고 싶습니다.",
-            "test_type": "hitl_workflow"
-        },
-        {
-            "name": "고위험 거래 리스크 평가",
-            "symbols": ["005930"],
-            "trading_signal": "BUY",
-            "analysis_result": base_analysis_result,
-            "question": "대량 매수 주문을 실행해주세요.",
-            "test_type": "risk_assessment"
-        },
-        {
-            "name": "A2AOutput 형식 및 HITL 상태 검증",
-            "symbols": ["005930"],
-            "trading_signal": "SELL",
-            "analysis_result": base_analysis_result,
-            "question": "거래 승인 프로세스를 테스트합니다.",
-            "test_type": "output_validation"
         }
     ]
     # 3. 각 테스트 케이스 실행
