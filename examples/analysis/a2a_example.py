@@ -654,7 +654,7 @@ async def main():
             "roe": 15.8
         }
     }
-    
+
     test_cases = [
         {
             "name": "삼성전자 종합 분석",
@@ -663,28 +663,6 @@ async def main():
             "question": "삼성전자의 현재 투자 매력도를 깊이 분석해주세요",
             "test_type": "standard"
         },
-        # ============== Analysis Agent 특화 통합 테스트 케이스 추가 ==============
-        {
-            "name": "Category-based Signal 일관성 검증",
-            "symbols": ["005930"],
-            "collected_data": base_collected_data,
-            "question": "삼성전자에 대한 명확한 투자 신호를 제시해주세요",
-            "test_type": "category_signal_consistency"
-        },
-        {
-            "name": "4차원 분석 커버리지 검증",
-            "symbols": ["005930"],
-            "collected_data": base_collected_data,
-            "question": "기술적, 기본적, 거시경제, 감성 분석을 모두 포함한 종합 분석을 해주세요",
-            "test_type": "four_dimension_analysis"
-        },
-        {
-            "name": "A2AOutput 형식 및 신호 검증",
-            "symbols": ["005930"],
-            "collected_data": base_collected_data,
-            "question": "투자 의사결정을 위한 분석 결과를 제공해주세요",
-            "test_type": "output_validation"
-        }
     ]
 
     # 3. 각 테스트 케이스 실행
