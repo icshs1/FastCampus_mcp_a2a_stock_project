@@ -48,15 +48,6 @@ class FinancialAnalysisMCPServer(BaseMCPServer):
                 "log_requests": True,
                 "log_responses": debug,
             },
-            "timing": {
-                "include_in_response": True,
-                "log_slow_requests": True,
-                "slow_request_threshold": 3.0,  # 재무 분석 및 DCF 계산은 시간이 걸릴 수 있음
-            },
-            "caching": {
-                "default_ttl": 3600,  # 1시간 캐싱 (재무 데이터는 자주 바뀌지 않음)
-                "max_cache_size": 500,
-            },
             "error_handling": {
                 "include_traceback": debug,
             },
@@ -101,7 +92,7 @@ class FinancialAnalysisMCPServer(BaseMCPServer):
             재무제표 전체 데이터 조회
 
             Args:
-                symbol: 종목코드
+                symbol: 종목코드(6자리 숫자 - 한국주식)
                 statement_type: 재무제표 유형 ("all")
 
             Returns:

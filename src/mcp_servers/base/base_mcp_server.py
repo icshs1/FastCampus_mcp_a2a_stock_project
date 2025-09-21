@@ -69,7 +69,7 @@ class BaseMCPServer(ABC):
             server_instructions: 서버 설명 (기본값: "")
             json_response: JSON 응답 검증 여부 (기본값: False)
             shutdown_timeout: Graceful shutdown 타임아웃 (기본값: 30.0초)
-            enable_middlewares: 활성화할 미들웨어 리스트 (예: ["logging", "timing", "rate_limiting"])
+            enable_middlewares: 활성화할 미들웨어 리스트 (예: ["logging", "error_handling", "cors"])
             middleware_config: 미들웨어별 설정 딕셔너리
         """
         from fastmcp import FastMCP

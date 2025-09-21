@@ -28,7 +28,6 @@ async def create_analysis_agent(model=None, is_debug=False):
     1. 기술적 분석 (Technical Analysis)
     2. 기본적 분석 (Fundamental Analysis)
     3. 거시경제 분석 (Macroeconomic Analysis)
-    4. 감성 분석 (Sentiment Analysis)
 
     create_react_agent의 강력한 도구 호출 능력을 활용하여
     각 차원별 MCP 도구들을 체계적으로 실행하고 통합 분석 결과를 제공합니다.
