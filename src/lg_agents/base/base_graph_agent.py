@@ -145,7 +145,9 @@ class BaseGraphAgent:
     def graph(self):
         """그래프 접근자"""
         if self.lazy_init and self._graph is None:
-            raise RuntimeError("Agent not initialized. Call await agent.initialize() first.")
+            raise RuntimeError(
+                "Agent not initialized. Call await agent.initialize() first."
+            )
         return self._graph if self.lazy_init else self._internal_graph
 
     @graph.setter
@@ -155,7 +157,7 @@ class BaseGraphAgent:
         else:
             self._internal_graph = value
 
-    def get_node_name(self, key=""):
+    def get_node_name(self, key="") -> str:
         """
         노드 이름을 안전하게 가져오는 헬퍼 메서드.
 
@@ -171,9 +173,10 @@ class BaseGraphAgent:
         Raises:
             ValueError: 키가 NODE_NAMES에 정의되지 않은 경우
         """
-        if key not in self.NODE_NAMES:
+        name = self.NODE_NAMES.get(key, None)
+        if not name:
             raise ValueError(f"노드 이름 키 '{key}'가 정의되어 있지 않습니다.")
-        return self.NODE_NAMES.get(key)
+        return name
 
     def init_nodes(self, graph: StateGraph):
         """
@@ -274,7 +277,9 @@ class BaseGraphAgent:
         Returns:
             {"required": [...], "optional": [...]} 형태의 딕셔너리
         """
-        raise NotImplementedError("Subclasses must implement get_required_fields method")
+        raise NotImplementedError(
+            "Subclasses must implement get_required_fields method"
+        )
 
     def validate_input(self, data: dict) -> tuple[bool, str]:
         """
@@ -384,7 +389,9 @@ class BaseGraphAgent:
 
         return True  # 복잡한 타입은 일단 통과
 
-    def handle_agent_error(self, error: Exception, error_context: dict | None = None) -> None:
+    def handle_agent_error(
+        self, error: Exception, error_context: dict | None = None
+    ) -> None:
         """
         에이전트 실행 중 발생한 에러를 통합 처리합니다.
 

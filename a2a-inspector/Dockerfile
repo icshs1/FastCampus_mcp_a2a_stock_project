@@ -20,11 +20,21 @@ RUN npm rebuild esbuild
 RUN npm run build
 
 # Stage 2: Build the final application with the backend
-FROM python:3.10-slim
+# pyproject.toml이 requires-python >= 3.12를 요구하므로 3.12 사용
+FROM python:3.12-slim
 WORKDIR /app
+
+# cffi/cryptography 빌드에 필요한 시스템 패키지 설치
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libffi-dev \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN pip install uv
 COPY a2a-inspector/pyproject.toml a2a-inspector/uv.lock ./
-RUN uv sync --no-cache
+# Python 3.12를 명시적으로 지정하여 uv가 다른 버전을 찾지 않도록 함
+RUN uv sync --no-cache --python 3.12
 RUN uv pip install validators
 COPY a2a-inspector/backend/ ./backend/
 RUN mkdir -p /app/frontend
