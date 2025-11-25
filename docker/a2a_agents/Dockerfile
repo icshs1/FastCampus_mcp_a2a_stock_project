@@ -12,22 +12,18 @@ RUN apt-get update && apt-get install -y \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Python 의존성 복사 및 설치
-COPY ../../pyproject.toml ./
-COPY ../../src ./src
+# uv 설치 (공식 설치 스크립트 사용)
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-# uv 설치 및 의존성 설치
-RUN pip install --no-cache-dir uv && \
-    uv pip install --system -e .
+# Python 의존성 파일 복사
+# Note: build context가 프로젝트 루트(../../)이므로 상대 경로 사용
+COPY pyproject.toml uv.lock ./
 
-# A2A 관련 추가 패키지 설치
-RUN uv pip install --system \
-    langgraph \
-    langchain \
-    anthropic \
-    openai \
-    websockets \
-    uvicorn[standard]
+# uv sync로 의존성 설치 (lock 파일 기반 재현 가능한 설치)
+RUN uv sync --frozen --no-dev
+
+# 소스코드 복사
+COPY src ./src
 
 # 환경 변수 설정
 ENV PYTHONUNBUFFERED=1
@@ -44,5 +40,5 @@ USER appuser
 # 기본 포트 노출
 EXPOSE 8000
 
-# 기본 실행 명령 (환경변수로 AGENT_TYPE을 받아서 실행)
-CMD ["sh", "-c", "python -m src.a2a_agents.${AGENT_TYPE:-supervisor}.__main__"]
+# uv로 생성된 가상환경의 Python 사용
+CMD ["sh", "-c", "uv run python -m src.a2a_agents.${AGENT_TYPE:-supervisor}.__main__"]

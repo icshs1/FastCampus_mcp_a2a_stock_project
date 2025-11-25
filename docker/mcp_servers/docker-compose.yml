@@ -33,7 +33,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
-    command: python src/mcp_servers/kiwoom_mcp/domains/market_domain.py
+    command: uv run python src/mcp_servers/kiwoom_mcp/domains/market_domain.py
     profiles:
       - dev
       - prod
@@ -70,7 +70,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
-    command: python src/mcp_servers/kiwoom_mcp/domains/info_domain.py
+    command: uv run python src/mcp_servers/kiwoom_mcp/domains/info_domain.py
     profiles:
       - dev
       - prod
@@ -108,7 +108,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
-    command: python src/mcp_servers/kiwoom_mcp/domains/trading_domain.py
+    command: uv run python src/mcp_servers/kiwoom_mcp/domains/trading_domain.py
     profiles:
       - dev
       - prod
@@ -145,7 +145,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
-    command: python src/mcp_servers/kiwoom_mcp/domains/investor_domain.py
+    command: uv run python src/mcp_servers/kiwoom_mcp/domains/investor_domain.py
     profiles:
       - dev
       - prod
@@ -182,7 +182,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
-    command: python src/mcp_servers/kiwoom_mcp/domains/portfolio_domain.py
+    command: uv run python src/mcp_servers/kiwoom_mcp/domains/portfolio_domain.py
     profiles:
       - dev
       - prod
@@ -216,7 +216,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
-    command: python src/mcp_servers/stock_analysis_mcp/server.py
+    command: uv run python src/mcp_servers/stock_analysis_mcp/server.py
     profiles:
       - dev
       - prod
@@ -251,7 +251,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
-    command: python src/mcp_servers/financial_analysis_mcp/server.py
+    command: uv run python src/mcp_servers/financial_analysis_mcp/server.py
     profiles:
       - dev
       - prod
@@ -287,7 +287,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
-    command: python src/mcp_servers/macroeconomic_analysis_mcp/server.py
+    command: uv run python src/mcp_servers/macroeconomic_analysis_mcp/server.py
     profiles:
       - dev
       - prod
@@ -323,7 +323,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
-    command: python src/mcp_servers/naver_news_mcp/server.py
+    command: uv run python src/mcp_servers/naver_news_mcp/server.py
     profiles:
       - dev
       - prod
@@ -358,7 +358,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
-    command: python src/mcp_servers/tavily_search_mcp/server.py
+    command: uv run python src/mcp_servers/tavily_search_mcp/server.py
     profiles:
       - dev
       - prod

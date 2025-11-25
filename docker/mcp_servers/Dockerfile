@@ -9,22 +9,20 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+# uv 설치 (공식 multi-stage copy 방식)
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+# Python 의존성 파일 복사
+# Note: build context가 프로젝트 루트(../../)이므로 상대 경로 사용
+COPY pyproject.toml uv.lock ./
+
+# uv sync로 의존성 설치 (lock 파일 기반 재현 가능한 설치)
+# --frozen: lock 파일을 그대로 사용 (업데이트 시도 안함)
+# --no-dev: 개발 의존성 제외
+RUN uv sync --frozen --no-dev
+
 # 소스코드 복사
 COPY src ./src
-
-# NOTE: MCP SDK 및 관련 패키지 설치(일부러 uv 에 있는것보다 적게 설치)
-RUN pip install \
-    fastmcp \
-    httpx \ 
-    httpx-sse \
-    tavily-python \
-    fredapi \
-    finance-datareader \
-    publicdatareader \
-    pandas \
-    structlog \
-    psutil
-
 
 # 환경 변수 설정
 ENV PYTHONUNBUFFERED=1
