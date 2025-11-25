@@ -117,7 +117,7 @@ Human-in-the-Loop 승인이 필요한 경우 명확한 리스크 분석을 제�
                 analysis_result=test_request["analysis_result"],
                 user_question=test_request["user_question"],
             ),
-            timeout=120.0
+            timeout=120.0,
         )
         print("\n모든 거래 도구 호출 완료")
     except asyncio.TimeoutError:
@@ -125,7 +125,7 @@ Human-in-the-Loop 승인이 필요한 경우 명확한 리스크 분석을 제�
         result = {
             "success": False,
             "error": "Trading execution timeout after 120 seconds",
-            "messages": []
+            "messages": [],
         }
 
         # 5. 결과 출력
@@ -137,10 +137,9 @@ Human-in-the-Loop 승인이 필요한 경우 명확한 리스크 분석을 제�
             trading_result = result.get("result", {})
 
             #  도구 호출 검증 로직 추가
-            tool_calls = trading_result.get('tool_calls_made', 0)
+            tool_calls = trading_result.get("tool_calls_made", 0)
             print("\n도구 호출 검증:")
             print(f"  - 도구 호출 횟수: {tool_calls}회")
-
 
         # 6. 전체 결과를 JSON 파일로 저장
         output_dir = Path("../../logs/examples/langgraph")
